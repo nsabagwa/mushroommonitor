@@ -1,5 +1,7 @@
+reports/
 *.env
 .cursor/
 .vscode/
 .github/*
 .gitignore
+.saropa/
