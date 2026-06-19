@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/app_state_provider.dart';
 import '../widgets/theme_selector.dart';
@@ -20,6 +21,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notificationsAsync = ref.watch(notificationsEnabledProvider);
     final autoReconnectAsync = ref.watch(autoReconnectEnabledProvider);
+    final Uri bugReport = Uri.parse('https://forms.gle/irGv2LqJKqRvGWCV8');
+    final Uri privacyPolicy = Uri.parse('https://tinyurl.com/yn39ncxh');
 
     return Scaffold(
       appBar: AppBar(
@@ -40,7 +43,9 @@ class SettingsScreen extends ConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.palette_outlined),
                   title: const Text('Theme'),
-                  subtitle: Text(_getThemeModeLabel(ref.watch(themeModeProvider))),
+                  subtitle: Text(
+                    _getThemeModeLabel(ref.watch(themeModeProvider)),
+                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => ThemeSelector.showBottomSheet(context),
                 ),
@@ -130,8 +135,12 @@ class SettingsScreen extends ConsumerWidget {
                   leading: const Icon(Icons.bug_report_outlined),
                   title: const Text('Report Bug'),
                   trailing: const Icon(Icons.open_in_new),
-                  onTap: () {
-                    // TODO: Open bug report URL
+                  onTap: () async {
+                    if (await launchUrl(bugReport)) {
+                      await launchUrl(bugReport);
+                    } else {
+                      debugPrint("Could not launch $bugReport");
+                    }
                   },
                 ),
                 const Divider(height: 1),
@@ -139,8 +148,12 @@ class SettingsScreen extends ConsumerWidget {
                   leading: const Icon(Icons.privacy_tip_outlined),
                   title: const Text('Privacy Policy'),
                   trailing: const Icon(Icons.open_in_new),
-                  onTap: () {
-                    // TODO: Open privacy policy
+                  onTap: () async {
+                    if (await launchUrl(privacyPolicy)) {
+                      await launchUrl(privacyPolicy);
+                    } else {
+                      debugPrint("Could not launch $privacyPolicy");
+                    }
                   },
                 ),
               ],
@@ -226,9 +239,9 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

@@ -72,7 +72,7 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
             );
             return const Text('Loading...');
           },
-          error: (error, __) {
+          error: (error, _) {
             developer.log(
               '❌ [FarmDetailScreen] AppBar error: $error',
               name: 'mushpi.screens.farm_detail',

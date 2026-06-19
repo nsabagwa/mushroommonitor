@@ -1072,7 +1072,7 @@ class _ActuatorStateCard extends ConsumerWidget {
                 }
 
                 final theme = Theme.of(context);
-                final actuatorStatus = actuatorStatusAsync.valueOrNull;
+                final actuatorStatus = actuatorStatusAsync.asData?.value;
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
