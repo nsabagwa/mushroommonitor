@@ -196,7 +196,7 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
     return Column(
       children: [
         // Quick Reconnect Card
-        _QuickReconnectCard(),
+        const _QuickReconnectCard(),
         
         // Device List
         Expanded(
@@ -227,7 +227,7 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
             Icon(
               Icons.bluetooth_searching,
               size: 120,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(
@@ -262,7 +262,7 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
             Icon(
               Icons.bluetooth_disabled,
               size: 120,
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(
@@ -756,11 +756,11 @@ class _QuickReconnectCard extends ConsumerWidget {
                 Text(
                   'Reconnect to your last connected device',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8),
+                        color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
                       ),
                 ),
                 const SizedBox(height: 16),
-                Row(
+                const Row(
                   children: [
                     Expanded(
                       child: _ReconnectButton(),

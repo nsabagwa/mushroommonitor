@@ -33,7 +33,7 @@ class ThingSpeakConfig {
   static ThingSpeakConfig fromEnv() {
     final env = dotenv.env;
 
-    bool _getBool(String key, bool defaultValue) {
+    bool getBool(String key, bool defaultValue) {
       final v = env[key];
       if (v == null) return defaultValue;
       final lower = v.toLowerCase().trim();
@@ -43,25 +43,25 @@ class ThingSpeakConfig {
           lower == 'on';
     }
 
-    String _getString(String key, [String defaultValue = '']) {
+    String getString(String key, [String defaultValue = '']) {
       final v = env[key];
       if (v == null) return defaultValue;
       return v.trim();
     }
 
     return ThingSpeakConfig(
-      enabled: _getBool('MUSHPI_THINGSPEAK_ENABLED', false),
+      enabled: getBool('MUSHPI_THINGSPEAK_ENABLED', false),
       // Separate read key so backend can use write key; caller may set them equal.
-      readApiKey: _getString('MUSHPI_THINGSPEAK_READ_API_KEY'),
-      channelId: _getString('MUSHPI_THINGSPEAK_CHANNEL_ID'),
-      baseUrl: _getString(
+      readApiKey: getString('MUSHPI_THINGSPEAK_READ_API_KEY'),
+      channelId: getString('MUSHPI_THINGSPEAK_CHANNEL_ID'),
+      baseUrl: getString(
         'MUSHPI_THINGSPEAK_BASE_URL',
         'https://api.thingspeak.com/channels',
       ),
-      fieldTemperature: _getString('MUSHPI_THINGSPEAK_FIELD_TEMPERATURE'),
-      fieldHumidity: _getString('MUSHPI_THINGSPEAK_FIELD_HUMIDITY'),
-      fieldCo2: _getString('MUSHPI_THINGSPEAK_FIELD_CO2'),
-      fieldLight: _getString('MUSHPI_THINGSPEAK_FIELD_LIGHT'),
+      fieldTemperature: getString('MUSHPI_THINGSPEAK_FIELD_TEMPERATURE'),
+      fieldHumidity: getString('MUSHPI_THINGSPEAK_FIELD_HUMIDITY'),
+      fieldCo2: getString('MUSHPI_THINGSPEAK_FIELD_CO2'),
+      fieldLight: getString('MUSHPI_THINGSPEAK_FIELD_LIGHT'),
     );
   }
 

@@ -618,7 +618,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
                   color: Theme.of(context)
                       .colorScheme
                       .onSurfaceVariant
-                      .withOpacity(0.5),
+                      .withValues(alpha: 0.5),
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -770,7 +770,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -1033,11 +1033,11 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         // Expected Duration
         TextField(
           controller: controllers['expectedDays'],
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             labelText: 'Expected Duration (days)',
-            border: const OutlineInputBorder(),
+            border: OutlineInputBorder(),
             helperText: 'How long does this stage typically last?',
-            prefixIcon: const Icon(Icons.schedule),
+            prefixIcon: Icon(Icons.schedule),
           ),
           keyboardType: TextInputType.number,
           onChanged: (_) => setState(() => _hasChanges = true),
@@ -1357,7 +1357,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),

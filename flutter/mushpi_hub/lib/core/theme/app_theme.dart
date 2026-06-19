@@ -234,7 +234,7 @@ class AppTheme {
         activeTrackColor: lightColorScheme.primary,
         inactiveTrackColor: lightColorScheme.surfaceContainerHighest,
         thumbColor: lightColorScheme.primary,
-        overlayColor: lightColorScheme.primary.withOpacity(0.12),
+        overlayColor: lightColorScheme.primary.withValues(alpha: 0.12),
         valueIndicatorColor: lightColorScheme.primary,
         valueIndicatorTextStyle: GoogleFonts.roboto(
           fontSize: 14,
@@ -521,7 +521,7 @@ class AppTheme {
         activeTrackColor: darkColorScheme.primary,
         inactiveTrackColor: darkColorScheme.surfaceContainerHighest,
         thumbColor: darkColorScheme.primary,
-        overlayColor: darkColorScheme.primary.withOpacity(0.12),
+        overlayColor: darkColorScheme.primary.withValues(alpha: 0.12),
         valueIndicatorColor: darkColorScheme.primary,
         valueIndicatorTextStyle: GoogleFonts.roboto(
           fontSize: 14,

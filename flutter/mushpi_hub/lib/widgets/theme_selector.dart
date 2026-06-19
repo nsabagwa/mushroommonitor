@@ -126,7 +126,7 @@ class _ThemeModeOption extends StatelessWidget {
               color: colorScheme.onSurfaceVariant,
             ),
       selected: isSelected,
-      selectedTileColor: colorScheme.primaryContainer.withOpacity(0.3),
+      selectedTileColor: colorScheme.primaryContainer.withValues(alpha: 0.3),
       onTap: onTap,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -283,7 +283,7 @@ class _AnimatedThemeSwitchState extends ConsumerState<AnimatedThemeSwitch>
                       color: Theme.of(context).colorScheme.primary,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),

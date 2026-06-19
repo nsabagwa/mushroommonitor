@@ -98,14 +98,18 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
             if (thresholds.tempMax != null) _tempMax = thresholds.tempMax!;
             if (thresholds.rhMin != null) _rhMin = thresholds.rhMin!;
             if (thresholds.co2Max != null) _co2Max = thresholds.co2Max!;
-            if (thresholds.lightMode != null)
+            if (thresholds.lightMode != null) {
               _lightMode = thresholds.lightMode!;
-            if (thresholds.lightOnMinutes != null)
+            }
+            if (thresholds.lightOnMinutes != null) {
               _onMinutes = thresholds.lightOnMinutes!;
-            if (thresholds.lightOffMinutes != null)
+            }
+            if (thresholds.lightOffMinutes != null) {
               _offMinutes = thresholds.lightOffMinutes!;
-            if (thresholds.expectedDays != null)
+            }
+            if (thresholds.expectedDays != null) {
               _expectedDays = thresholds.expectedDays!;
+            }
           });
 
           developer.log(
@@ -325,7 +329,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
                   color: Theme.of(context)
                       .colorScheme
                       .onSurfaceVariant
-                      .withOpacity(0.5),
+                      .withValues(alpha: 0.5),
                 ),
                 const SizedBox(height: 24),
                 Text(

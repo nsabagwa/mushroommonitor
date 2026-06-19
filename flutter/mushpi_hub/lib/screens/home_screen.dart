@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
+import '../providers/thingspeak_provider.dart';
 import '../providers/farms_provider.dart';
 import '../providers/current_farm_provider.dart';
 import '../widgets/farm_card.dart';
@@ -26,6 +26,16 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('My Farms'),
         actions: [
+          // Temporary button
+          IconButton(
+            icon: const Icon(Icons.cloud),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => const _ThingSpeakTestDialog(),
+              );
+            },
+          ),
           // Theme toggle
           const ThemeToggleButton(),
         ],
@@ -64,7 +74,9 @@ class HomeScreen extends ConsumerWidget {
                           farm: farm,
                           onTap: () {
                             // Set the farm for monitoring and navigate to monitoring tab
-                            ref.read(selectedMonitoringFarmIdProvider.notifier).state = farm.id;
+                            ref
+                                .read(selectedMonitoringFarmIdProvider.notifier)
+                                .state = farm.id;
                             context.go('/monitoring');
                           },
                         );
@@ -140,7 +152,8 @@ class _EmptyFarmsView extends StatelessWidget {
             Icon(
               Icons.eco_outlined,
               size: 120,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(
@@ -263,6 +276,39 @@ class _StatItem extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+} // import at top
+
+class _ThingSpeakTestDialog extends ConsumerWidget {
+  const _ThingSpeakTestDialog();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncData = ref.watch(thingSpeakProvider);
+
+    return AlertDialog(
+      title: const Text('ThingSpeak Test'),
+      content: asyncData.when(
+        data: (reading) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Time: ${reading.time}'),
+            Text('Temp: ${reading.temperature}°C'),
+            Text('Hum: ${reading.humidity}%'),
+            Text('CO2: ${reading.co2} ppm'),
+            Text('Light: ${reading.light}'),
+          ],
+        ),
+        loading: () => const CircularProgressIndicator(),
+        error: (e, _) => Text('Error: $e'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('OK'),
         ),
       ],
     );

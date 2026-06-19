@@ -218,7 +218,7 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
             Icon(
               Icons.search_off,
               size: 120,
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(

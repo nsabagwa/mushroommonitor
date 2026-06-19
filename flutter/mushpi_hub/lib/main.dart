@@ -5,7 +5,7 @@ import 'package:mushpi_hub/data/repositories/ble_repository.dart';
 import 'app.dart';
 
 /// MushPi Mobile Controller
-/// 
+///
 /// Main entry point for the MushPi mobile application.
 /// Wraps the app with ProviderScope for Riverpod state management.
 Future<void> main() async {

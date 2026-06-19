@@ -6,16 +6,17 @@ import 'package:go_router/go_router.dart';
 import '../providers/farms_provider.dart';
 import '../providers/current_farm_provider.dart';
 import '../providers/actuator_state_provider.dart';
+import '../providers/thingspeak_provider.dart'; // ThingSpeak remote data
 import '../data/models/relay_reason_code.dart';
-import '../providers/ble_provider.dart';
+import '../providers/ble_provider.dart'; // still used for actuators & stage
 import '../core/constants/ble_constants.dart';
 import '../core/utils/ble_serializer.dart';
 import '../data/models/farm.dart';
 
-/// Monitoring screen showing real-time environmental data and system status.
+/// Monitoring screen showing real‑time environmental data and system status.
 ///
 /// Displays:
-/// - Real-time environmental metrics across all farms
+/// - Real‑time environmental metrics from ThingSpeak (remote)
 /// - System alerts and notifications
 /// - Compliance indicators
 /// - Quick action buttons
@@ -28,32 +29,7 @@ class MonitoringScreen extends ConsumerStatefulWidget {
 }
 
 class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Start auto-refresh when screen is shown
-    _startAutoRefresh();
-  }
-
-  @override
-  void dispose() {
-    _stopAutoRefresh();
-    super.dispose();
-  }
-
-  void _startAutoRefresh() {
-    // Refresh every 30 seconds
-    Future.delayed(const Duration(seconds: 30), () {
-      if (mounted) {
-        ref.invalidate(selectedMonitoringFarmLatestReadingProvider);
-        _startAutoRefresh();
-      }
-    });
-  }
-
-  void _stopAutoRefresh() {
-    // The mounted check in _startAutoRefresh will prevent further refreshes
-  }
+  // No auto-refresh needed – ThingSpeak stream updates every 30 seconds
 
   @override
   Widget build(BuildContext context) {
@@ -117,8 +93,6 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                               ElevatedButton(
                                 onPressed: () {
                                   Navigator.of(context).pop();
-                                  // Navigate to Farms tab with mounted check
-                                  // to avoid navigation stack errors
                                   if (context.mounted) {
                                     context.go('/farms');
                                   }
@@ -192,7 +166,6 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
 
           // If single farm and no selection, auto-select it
           if (farms.length == 1 && selectedFarmId == null) {
-            // Auto-select the only farm
             WidgetsBinding.instance.addPostFrameCallback((_) {
               ref.read(selectedMonitoringFarmIdProvider.notifier).state =
                   farms.first.id;
@@ -296,7 +269,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                     ),
                   ),
 
-                // Environmental overview for selected farm
+                // Environmental overview – always remote (ThingSpeak)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -307,9 +280,9 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
                 // Stage Progress card
-                SliverToBoxAdapter(
+                const SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
                     child: _StageProgressCard(),
                   ),
                 ),
@@ -416,7 +389,8 @@ class _FarmSelectorView extends StatelessWidget {
             Icon(
               Icons.monitor_heart_outlined,
               size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(
@@ -558,8 +532,8 @@ class _FarmStatusCard extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: isOnline
-                        ? Colors.green.withOpacity(0.2)
-                        : Colors.grey.withOpacity(0.2),
+                        ? Colors.green.withValues(alpha: 0.2)
+                        : Colors.grey.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -702,7 +676,8 @@ class _EmptyMonitoringView extends StatelessWidget {
             Icon(
               Icons.monitor_outlined,
               size: 120,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(
@@ -737,22 +712,15 @@ class _EmptyMonitoringView extends StatelessWidget {
   }
 }
 
-/// Environmental overview card for single farm
+/// Environmental overview card – now always uses ThingSpeak remote data
 class _EnvironmentalOverviewCard extends ConsumerWidget {
   const _EnvironmentalOverviewCard({required this.farm});
 
   final Farm farm;
 
-  bool get _isBleConnected {
-    if (farm.lastActive == null) return false;
-    return DateTime.now().difference(farm.lastActive!).inMinutes < 1;
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the latest reading for the selected farm
-    final readingAsync = ref.watch(selectedMonitoringFarmLatestReadingProvider);
-    final isBleConnected = _isBleConnected;
+    final thingSpeakAsync = ref.watch(thingSpeakProvider);
 
     return Card(
       elevation: 2,
@@ -761,151 +729,15 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Environmental Data',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ),
-                // Mode indicator (Local/Online)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isBleConnected
-                        ? Colors.green.withOpacity(0.15)
-                        : Colors.blue.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isBleConnected ? Colors.green : Colors.blue,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isBleConnected ? Icons.bluetooth_connected : Icons.cloud,
-                        size: 16,
-                        color: isBleConnected ? Colors.green : Colors.blue,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isBleConnected ? 'Local' : 'Online',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: isBleConnected ? Colors.green : Colors.blue,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                readingAsync.when(
-                  data: (reading) => reading != null
-                      ? _TimestampChip(timestamp: reading.timestamp)
-                      : const SizedBox.shrink(),
-                  loading: () => const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
-              ],
-            ),
+            // Header – always shows "Remote" and timestamp
+            _buildHeader(context, thingSpeakAsync),
             const SizedBox(height: 16),
-            readingAsync.when(
-                data: (reading) {
-                  if (reading == null) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text(
-                          'No sensor data available',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                        ),
-                      ),
-                    );
-                  }
 
-                  return Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _EnvironmentalMetric(
-                              icon: Icons.thermostat,
-                              label: 'Temperature',
-                              value:
-                                  '${reading.temperatureC.toStringAsFixed(1)}°C',
-                              color: _getTemperatureColor(reading.temperatureC),
-                            ),
-                          ),
-                          Expanded(
-                            child: _EnvironmentalMetric(
-                              icon: Icons.water_drop,
-                              label: 'Humidity',
-                              value:
-                                  '${reading.relativeHumidity.toStringAsFixed(0)}%',
-                              color:
-                                  _getHumidityColor(reading.relativeHumidity),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _EnvironmentalMetric(
-                              icon: Icons.air,
-                              label: 'CO₂',
-                              value: '${reading.co2Ppm} ppm',
-                              color: _getCO2Color(reading.co2Ppm),
-                            ),
-                          ),
-                          Expanded(
-                            child: _EnvironmentalMetric(
-                              icon: Icons.light_mode,
-                              label: 'Light',
-                              value: reading.lightRaw.toString(),
-                              color: Colors.amber,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-                loading: () => const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
-                  ),
-                ),
-                error: (error, stack) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'Error loading sensor data',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                    ),
-                  ),
-                ),
-              ),
+            // ThingSpeak data
+            _buildThingSpeakData(context, thingSpeakAsync),
+
             const SizedBox(height: 16),
-            // Improved chart navigation button
+            // Chart navigation button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -927,6 +759,125 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(
+      BuildContext context, AsyncValue<ThingSpeakReading> thingSpeakAsync) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'Environmental Data',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ),
+        // "Remote" badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.blue.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue, width: 1.5),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud, size: 16, color: Colors.blue),
+              SizedBox(width: 6),
+              Text(
+                'Remote',
+                style: TextStyle(
+                  color: Colors.blue,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Timestamp
+        thingSpeakAsync.when(
+          data: (reading) => _TimestampChip(timestamp: reading.time),
+          loading: () => const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThingSpeakData(
+      BuildContext context, AsyncValue<ThingSpeakReading> asyncReading) {
+    return asyncReading.when(
+      data: (reading) => Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _EnvironmentalMetric(
+                  icon: Icons.thermostat,
+                  label: 'Temperature',
+                  value: '${reading.temperature?.toStringAsFixed(1) ?? "--"}°C',
+                  color: _getTemperatureColor(reading.temperature ?? 20),
+                ),
+              ),
+              Expanded(
+                child: _EnvironmentalMetric(
+                  icon: Icons.water_drop,
+                  label: 'Humidity',
+                  value: '${reading.humidity?.toStringAsFixed(0) ?? "--"}%',
+                  color: _getHumidityColor(reading.humidity ?? 70),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _EnvironmentalMetric(
+                  icon: Icons.air,
+                  label: 'CO₂',
+                  value: '${reading.co2 ?? "--"} ppm',
+                  color: _getCO2Color(reading.co2?.toInt() ?? 0),
+                ),
+              ),
+              Expanded(
+                child: _EnvironmentalMetric(
+                  icon: Icons.light_mode,
+                  label: 'Light',
+                  value: '${reading.light ?? "--"} lx',
+                  color: Colors.amber,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      error: (err, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            'Could not load remote data',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+          ),
         ),
       ),
     );
@@ -980,8 +931,8 @@ class _TimestampChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: isRecent
-            ? Colors.green.withOpacity(0.2)
-            : Colors.grey.withOpacity(0.2),
+            ? Colors.green.withValues(alpha: 0.2)
+            : Colors.grey.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -1083,7 +1034,7 @@ class _EnvironmentalMetric extends StatelessWidget {
   }
 }
 
-/// Actuator modes/state card
+/// Actuator modes/state card (unchanged)
 class _ActuatorStateCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1117,12 +1068,10 @@ class _ActuatorStateCard extends ConsumerWidget {
             targetsAsync.when(
               data: (targets) {
                 if (targets == null) {
-                  return _ActuatorUnavailable();
+                  return const _ActuatorUnavailable();
                 }
 
                 final theme = Theme.of(context);
-
-                // Get actuator status or null if not available
                 final actuatorStatus = actuatorStatusAsync.valueOrNull;
 
                 return Column(
@@ -1212,14 +1161,13 @@ class _ActuatorChip extends StatelessWidget {
   final String value;
   final Color color;
   final String? subtitle;
-  final bool? statusValue; // null = not available, true = ON, false = OFF
-  final int? reasonCode; // Reason code for relay state (0-255)
+  final bool? statusValue;
+  final int? reasonCode;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    // Determine status display
     String? statusText;
     Color? statusColor;
     String? reasonText;
@@ -1227,11 +1175,9 @@ class _ActuatorChip extends StatelessWidget {
       statusText = statusValue! ? 'ON' : 'OFF';
       statusColor = statusValue! ? Colors.green : Colors.grey;
 
-      // Decode reason code if available
       if (reasonCode != null && reasonCode! > 0) {
         final reason = RelayReasonCode.fromCode(reasonCode!);
         reasonText = reason.shortDisplay;
-        // Use reason color only for warnings
         if (reason.isWarning) {
           statusColor = Color(reason.displayColor);
         }
@@ -1269,7 +1215,7 @@ class _ActuatorChip extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: statusColor!.withOpacity(0.15),
+                    color: statusColor!.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: statusColor, width: 1.5),
                   ),
@@ -1345,7 +1291,7 @@ class _ActuatorUnavailable extends StatelessWidget {
   }
 }
 
-/// Stage Progress card showing cultivation stage and progression
+/// Stage Progress card (unchanged)
 class _StageProgressCard extends ConsumerStatefulWidget {
   const _StageProgressCard();
 
@@ -1493,7 +1439,6 @@ class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
       );
     }
 
-    // Calculate progress
     final daysElapsed = _stageData!.daysInStage;
     final expectedDays = _stageData!.expectedDays;
     final progressPercent = expectedDays > 0
@@ -1504,7 +1449,6 @@ class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Current Stage Info
         Row(
           children: [
             Expanded(
@@ -1549,8 +1493,6 @@ class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
           ],
         ),
         const SizedBox(height: 20),
-
-        // Progress Bar
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1587,8 +1529,6 @@ class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
           ],
         ),
         const SizedBox(height: 16),
-
-        // Additional Info
         Row(
           children: [
             Expanded(
@@ -1613,17 +1553,15 @@ class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
             ),
           ],
         ),
-
-        // Next stage hint (only if not complete and not in MANUAL mode)
         if (progressPercent < 100 && _stageData!.mode != ControlMode.manual)
           Padding(
             padding: const EdgeInsets.only(top: 16.0),
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: cs.secondaryContainer.withOpacity(0.5),
+                color: cs.secondaryContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: cs.outline.withOpacity(0.3)),
+                border: Border.all(color: cs.outline.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -1667,7 +1605,6 @@ class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
   }
 }
 
-/// Stage metric display widget
 class _StageMetric extends StatelessWidget {
   final IconData icon;
   final String label;

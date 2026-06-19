@@ -636,8 +636,9 @@ class BLERepository {
           _statusFlagsChar == null ||
           _stageThresholdsChar == null) {
         debugPrint('❌ [BLE DISCOVER] Missing characteristics:');
-        if (_envMeasurementsChar == null)
+        if (_envMeasurementsChar == null) {
           debugPrint('  ❌ Environmental Measurements');
+        }
         if (_controlTargetsChar == null) debugPrint('  ❌ Control Targets');
         if (_stageStateChar == null) debugPrint('  ❌ Stage State');
         if (_overrideBitsChar == null) debugPrint('  ❌ Override Bits');
