@@ -7871,7 +7871,7 @@ Monitoring Tab (direct access):
 - ✅ **Route Structure**
   - `/` - Splash screen
   - `/farms` - Farms list (main tab)
-  - `/farms/scan` - Device scanning
+  - `/farm/$farmId/scan` - Device scanning
   - `/farms/history` - Historical data
   - `/monitoring` - Real-time monitoring (main tab)
   - `/settings` - App settings (main tab)

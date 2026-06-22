@@ -1479,7 +1479,7 @@ MushPi (BLE) → BLERepository.environmentalDataStream
 - ✅ **Route Changes**
   - `/` - Splash screen (unchanged)
   - `/farms` - Farms list screen (was `/home`)
-  - `/farms/scan` - Device scan screen (was `/home/scan`)
+  - `/farm/$farmId/scan` - Device scan screen (was `/home/scan`)
   - `/farms/history` - History screen (was `/home/history`)
   - `/monitoring` - Monitoring screen (NEW)
   - `/settings` - Settings screen (now at root level)

@@ -149,7 +149,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
         data: (farms) {
           if (farms.isEmpty) {
             return _EmptyMonitoringView(
-              onAddFarm: () => context.push('/farms/scan'),
+            onAddFarm: () => context.go('/farms'),
             );
           }
 
@@ -253,7 +253,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
-                                  onPressed: () => context.push('/farms/scan'),
+                                  onPressed: () => context.push('/farm/${selectedFarm.id}/scan'),
                                   icon: const Icon(Icons.refresh),
                                   label: const Text('Reconnect Device'),
                                   style: ElevatedButton.styleFrom(

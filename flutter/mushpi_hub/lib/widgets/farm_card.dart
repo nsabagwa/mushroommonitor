@@ -106,7 +106,7 @@ class FarmCard extends ConsumerWidget {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         // Navigate to farm detail or scan screen for reconnection
-                        context.push('/farms/scan');
+                        context.push('/farm/${farm.id}/scan');
                       },
                       icon: const Icon(Icons.refresh, size: 18),
                       label: const Text('Reconnect'),
