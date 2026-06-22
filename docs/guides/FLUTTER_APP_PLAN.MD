@@ -857,7 +857,7 @@ class CrossFarmComparison with _$CrossFarmComparison {
 class Farms extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
-  TextColumn get deviceId => text().unique()();  // One device per farm
+  TextColumn get deviceId => text().nullable().unique()();  // One device per farm
   TextColumn get location => text().nullable()();
   TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
@@ -893,7 +893,7 @@ class Harvests extends Table {
 
 // Updated Devices table (add farm relationship)
 class Devices extends Table {
-  TextColumn get deviceId => text()();
+  TextColumn get deviceId => text().nullable()();
   TextColumn get name => text()();
   TextColumn get address => text()();
   TextColumn get farmId => text().nullable().references(Farms, #id)();  // NEW
@@ -2552,7 +2552,7 @@ class Settings extends Table {
 
 // Devices table (remembered devices)
 class Devices extends Table {
-  TextColumn get deviceId => text()();
+  TextColumn get deviceId => text().nullable()();
   TextColumn get name => text()();
   TextColumn get address => text()();
   DateTimeColumn get lastConnected => dateTime()();

@@ -10,7 +10,7 @@ class Farm with _$Farm {
   const factory Farm({
     required String id, // Unique farm ID (UUID)
     required String name, // User-defined name
-    required String deviceId, // Linked MushPi device ID (one-to-one)
+    String? deviceId, // Linked MushPi device ID (one-to-one)
     String? location, // Optional location
     String? notes, // Farm notes/description
     required DateTime createdAt, // Farm creation date
@@ -109,7 +109,7 @@ class CrossFarmComparison with _$CrossFarmComparison {
 @freezed
 class DeviceInfo with _$DeviceInfo {
   const factory DeviceInfo({
-    required String deviceId,
+    String? deviceId, //null = no device linked yet
     required String name,
     required String address,
     String? farmId,

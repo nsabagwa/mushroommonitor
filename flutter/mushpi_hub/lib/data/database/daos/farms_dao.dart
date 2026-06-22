@@ -78,7 +78,7 @@ class FarmsDao extends DatabaseAccessor<AppDatabase> with _$FarmsDaoMixin {
   }
 
   /// Link device to farm
-  Future<int> linkDeviceToFarm(String farmId, String deviceId) {
+  Future<int> linkDeviceToFarm(String farmId, String? deviceId) async {
     return (update(farms)..where((f) => f.id.equals(farmId)))
         .write(FarmsCompanion(deviceId: Value(deviceId)));
   }

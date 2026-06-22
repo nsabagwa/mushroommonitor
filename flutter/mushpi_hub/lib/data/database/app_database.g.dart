@@ -22,9 +22,9 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
       const VerificationMeta('deviceId');
   @override
   late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
-      'device_id', aliasedName, false,
+      'device_id', aliasedName, true,
       type: DriftSqlType.string,
-      requiredDuringInsert: true,
+      requiredDuringInsert: false,
       defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
   static const VerificationMeta _locationMeta =
       const VerificationMeta('location');
@@ -133,8 +133,6 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
     if (data.containsKey('device_id')) {
       context.handle(_deviceIdMeta,
           deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
-    } else if (isInserting) {
-      context.missing(_deviceIdMeta);
     }
     if (data.containsKey('location')) {
       context.handle(_locationMeta,
@@ -200,7 +198,7 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
       name: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
       deviceId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
       location: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}location']),
       notes: attachedDatabase.typeMapping
@@ -233,7 +231,7 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
 class Farm extends DataClass implements Insertable<Farm> {
   final String id;
   final String name;
-  final String deviceId;
+  final String? deviceId;
   final String? location;
   final String? notes;
   final DateTime createdAt;
@@ -247,7 +245,7 @@ class Farm extends DataClass implements Insertable<Farm> {
   const Farm(
       {required this.id,
       required this.name,
-      required this.deviceId,
+      this.deviceId,
       this.location,
       this.notes,
       required this.createdAt,
@@ -263,7 +261,9 @@ class Farm extends DataClass implements Insertable<Farm> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
-    map['device_id'] = Variable<String>(deviceId);
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
     if (!nullToAbsent || location != null) {
       map['location'] = Variable<String>(location);
     }
@@ -293,7 +293,9 @@ class Farm extends DataClass implements Insertable<Farm> {
     return FarmsCompanion(
       id: Value(id),
       name: Value(name),
-      deviceId: Value(deviceId),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
       location: location == null && nullToAbsent
           ? const Value.absent()
           : Value(location),
@@ -324,7 +326,7 @@ class Farm extends DataClass implements Insertable<Farm> {
     return Farm(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
-      deviceId: serializer.fromJson<String>(json['deviceId']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
       location: serializer.fromJson<String?>(json['location']),
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -343,7 +345,7 @@ class Farm extends DataClass implements Insertable<Farm> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
-      'deviceId': serializer.toJson<String>(deviceId),
+      'deviceId': serializer.toJson<String?>(deviceId),
       'location': serializer.toJson<String?>(location),
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -360,7 +362,7 @@ class Farm extends DataClass implements Insertable<Farm> {
   Farm copyWith(
           {String? id,
           String? name,
-          String? deviceId,
+          Value<String?> deviceId = const Value.absent(),
           Value<String?> location = const Value.absent(),
           Value<String?> notes = const Value.absent(),
           DateTime? createdAt,
@@ -374,7 +376,7 @@ class Farm extends DataClass implements Insertable<Farm> {
       Farm(
         id: id ?? this.id,
         name: name ?? this.name,
-        deviceId: deviceId ?? this.deviceId,
+        deviceId: deviceId.present ? deviceId.value : this.deviceId,
         location: location.present ? location.value : this.location,
         notes: notes.present ? notes.value : this.notes,
         createdAt: createdAt ?? this.createdAt,
@@ -469,7 +471,7 @@ class Farm extends DataClass implements Insertable<Farm> {
 class FarmsCompanion extends UpdateCompanion<Farm> {
   final Value<String> id;
   final Value<String> name;
-  final Value<String> deviceId;
+  final Value<String?> deviceId;
   final Value<String?> location;
   final Value<String?> notes;
   final Value<DateTime> createdAt;
@@ -500,7 +502,7 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
   FarmsCompanion.insert({
     required String id,
     required String name,
-    required String deviceId,
+    this.deviceId = const Value.absent(),
     this.location = const Value.absent(),
     this.notes = const Value.absent(),
     required DateTime createdAt,
@@ -514,7 +516,6 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name),
-        deviceId = Value(deviceId),
         createdAt = Value(createdAt);
   static Insertable<Farm> custom({
     Expression<String>? id,
@@ -553,7 +554,7 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
   FarmsCompanion copyWith(
       {Value<String>? id,
       Value<String>? name,
-      Value<String>? deviceId,
+      Value<String?>? deviceId,
       Value<String?>? location,
       Value<String?>? notes,
       Value<DateTime>? createdAt,
@@ -1219,8 +1220,8 @@ class $DevicesTable extends Devices with TableInfo<$DevicesTable, Device> {
       const VerificationMeta('deviceId');
   @override
   late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
-      'device_id', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+      'device_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
@@ -1262,8 +1263,6 @@ class $DevicesTable extends Devices with TableInfo<$DevicesTable, Device> {
     if (data.containsKey('device_id')) {
       context.handle(_deviceIdMeta,
           deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
-    } else if (isInserting) {
-      context.missing(_deviceIdMeta);
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -1299,7 +1298,7 @@ class $DevicesTable extends Devices with TableInfo<$DevicesTable, Device> {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Device(
       deviceId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
       name: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
       address: attachedDatabase.typeMapping
@@ -1318,13 +1317,13 @@ class $DevicesTable extends Devices with TableInfo<$DevicesTable, Device> {
 }
 
 class Device extends DataClass implements Insertable<Device> {
-  final String deviceId;
+  final String? deviceId;
   final String name;
   final String address;
   final String? farmId;
   final DateTime lastConnected;
   const Device(
-      {required this.deviceId,
+      {this.deviceId,
       required this.name,
       required this.address,
       this.farmId,
@@ -1332,7 +1331,9 @@ class Device extends DataClass implements Insertable<Device> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['device_id'] = Variable<String>(deviceId);
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
     map['name'] = Variable<String>(name);
     map['address'] = Variable<String>(address);
     if (!nullToAbsent || farmId != null) {
@@ -1344,7 +1345,9 @@ class Device extends DataClass implements Insertable<Device> {
 
   DevicesCompanion toCompanion(bool nullToAbsent) {
     return DevicesCompanion(
-      deviceId: Value(deviceId),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
       name: Value(name),
       address: Value(address),
       farmId:
@@ -1357,7 +1360,7 @@ class Device extends DataClass implements Insertable<Device> {
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Device(
-      deviceId: serializer.fromJson<String>(json['deviceId']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
       name: serializer.fromJson<String>(json['name']),
       address: serializer.fromJson<String>(json['address']),
       farmId: serializer.fromJson<String?>(json['farmId']),
@@ -1368,7 +1371,7 @@ class Device extends DataClass implements Insertable<Device> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'deviceId': serializer.toJson<String>(deviceId),
+      'deviceId': serializer.toJson<String?>(deviceId),
       'name': serializer.toJson<String>(name),
       'address': serializer.toJson<String>(address),
       'farmId': serializer.toJson<String?>(farmId),
@@ -1377,13 +1380,13 @@ class Device extends DataClass implements Insertable<Device> {
   }
 
   Device copyWith(
-          {String? deviceId,
+          {Value<String?> deviceId = const Value.absent(),
           String? name,
           String? address,
           Value<String?> farmId = const Value.absent(),
           DateTime? lastConnected}) =>
       Device(
-        deviceId: deviceId ?? this.deviceId,
+        deviceId: deviceId.present ? deviceId.value : this.deviceId,
         name: name ?? this.name,
         address: address ?? this.address,
         farmId: farmId.present ? farmId.value : this.farmId,
@@ -1428,7 +1431,7 @@ class Device extends DataClass implements Insertable<Device> {
 }
 
 class DevicesCompanion extends UpdateCompanion<Device> {
-  final Value<String> deviceId;
+  final Value<String?> deviceId;
   final Value<String> name;
   final Value<String> address;
   final Value<String?> farmId;
@@ -1443,14 +1446,13 @@ class DevicesCompanion extends UpdateCompanion<Device> {
     this.rowid = const Value.absent(),
   });
   DevicesCompanion.insert({
-    required String deviceId,
+    this.deviceId = const Value.absent(),
     required String name,
     required String address,
     this.farmId = const Value.absent(),
     required DateTime lastConnected,
     this.rowid = const Value.absent(),
-  })  : deviceId = Value(deviceId),
-        name = Value(name),
+  })  : name = Value(name),
         address = Value(address),
         lastConnected = Value(lastConnected);
   static Insertable<Device> custom({
@@ -1472,7 +1474,7 @@ class DevicesCompanion extends UpdateCompanion<Device> {
   }
 
   DevicesCompanion copyWith(
-      {Value<String>? deviceId,
+      {Value<String?>? deviceId,
       Value<String>? name,
       Value<String>? address,
       Value<String?>? farmId,
@@ -2160,7 +2162,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $$FarmsTableCreateCompanionBuilder = FarmsCompanion Function({
   required String id,
   required String name,
-  required String deviceId,
+  Value<String?> deviceId,
   Value<String?> location,
   Value<String?> notes,
   required DateTime createdAt,
@@ -2176,7 +2178,7 @@ typedef $$FarmsTableCreateCompanionBuilder = FarmsCompanion Function({
 typedef $$FarmsTableUpdateCompanionBuilder = FarmsCompanion Function({
   Value<String> id,
   Value<String> name,
-  Value<String> deviceId,
+  Value<String?> deviceId,
   Value<String?> location,
   Value<String?> notes,
   Value<DateTime> createdAt,
@@ -2539,7 +2541,7 @@ class $$FarmsTableTableManager extends RootTableManager<
           updateCompanionCallback: ({
             Value<String> id = const Value.absent(),
             Value<String> name = const Value.absent(),
-            Value<String> deviceId = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
             Value<String?> location = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -2571,7 +2573,7 @@ class $$FarmsTableTableManager extends RootTableManager<
           createCompanionCallback: ({
             required String id,
             required String name,
-            required String deviceId,
+            Value<String?> deviceId = const Value.absent(),
             Value<String?> location = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             required DateTime createdAt,
@@ -3032,7 +3034,7 @@ typedef $$HarvestsTableProcessedTableManager = ProcessedTableManager<
     Harvest,
     PrefetchHooks Function({bool farmId})>;
 typedef $$DevicesTableCreateCompanionBuilder = DevicesCompanion Function({
-  required String deviceId,
+  Value<String?> deviceId,
   required String name,
   required String address,
   Value<String?> farmId,
@@ -3040,7 +3042,7 @@ typedef $$DevicesTableCreateCompanionBuilder = DevicesCompanion Function({
   Value<int> rowid,
 });
 typedef $$DevicesTableUpdateCompanionBuilder = DevicesCompanion Function({
-  Value<String> deviceId,
+  Value<String?> deviceId,
   Value<String> name,
   Value<String> address,
   Value<String?> farmId,
@@ -3217,7 +3219,7 @@ class $$DevicesTableTableManager extends RootTableManager<
           createComputedFieldComposer: () =>
               $$DevicesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
-            Value<String> deviceId = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
             Value<String> name = const Value.absent(),
             Value<String> address = const Value.absent(),
             Value<String?> farmId = const Value.absent(),
@@ -3233,7 +3235,7 @@ class $$DevicesTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           createCompanionCallback: ({
-            required String deviceId,
+            Value<String?> deviceId = const Value.absent(),
             required String name,
             required String address,
             Value<String?> farmId = const Value.absent(),

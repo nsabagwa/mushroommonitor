@@ -90,11 +90,14 @@ class FarmRepository {
     }
   }
 
-  /// Create a new farm
+  /// Create a new farm.
+  ///
+  /// [deviceId] is optional — a farm can be created without a linked device.
+  /// Use [linkDeviceToFarm] to associate a device later.
   Future<String> createFarm({
     required String id,
     required String name,
-    required String deviceId,
+    String? deviceId, // optional — no device required at creation
     String? location,
     String? notes,
     Species? primarySpecies,
@@ -109,7 +112,7 @@ class FarmRepository {
         location: Value(location),
         notes: Value(notes),
         createdAt: Value(DateTime.now()),
-        lastActive: Value(DateTime.now()),
+        lastActive: const Value.absent(), // no device = no last active yet
         totalHarvests: const Value(0),
         totalYieldKg: const Value(0.0),
         primarySpecies: Value(primarySpecies?.id),
@@ -121,7 +124,7 @@ class FarmRepository {
       await _database.farmsDao.insertFarm(companion);
 
       developer.log(
-        'Farm created: $name (ID: $id, Device: $deviceId)',
+        'Farm created: $name (ID: $id, Device: ${deviceId ?? "none"})',
         name: 'FarmRepository',
       );
 
@@ -183,7 +186,7 @@ class FarmRepository {
     }
   }
 
-  /// Delete a farm
+  /// Delete a farm permanently
   Future<void> deleteFarm(String id) async {
     try {
       await _database.farmsDao.deleteFarm(id);
@@ -208,7 +211,10 @@ class FarmRepository {
   // DEVICE MANAGEMENT
   // ========================
 
-  /// Link device to farm
+  /// Link a BLE device to a farm.
+  ///
+  /// Can be called at any time after farm creation.
+  /// Replaces any previously linked device.
   Future<void> linkDeviceToFarm(String farmId, String deviceId) async {
     try {
       await _database.farmsDao.linkDeviceToFarm(farmId, deviceId);
@@ -220,6 +226,29 @@ class FarmRepository {
     } catch (e, stackTrace) {
       developer.log(
         'Failed to link device to farm',
+        name: 'FarmRepository',
+        error: e,
+        stackTrace: stackTrace,
+        level: 1000,
+      );
+      rethrow;
+    }
+  }
+
+  /// Unlink the BLE device from a farm.
+  ///
+  /// Sets deviceId to null — the farm continues to exist without a device.
+  Future<void> unlinkDeviceFromFarm(String farmId) async {
+    try {
+      await _database.farmsDao.linkDeviceToFarm(farmId, null);
+
+      developer.log(
+        'Device unlinked from farm $farmId',
+        name: 'FarmRepository',
+      );
+    } catch (e, stackTrace) {
+      developer.log(
+        'Failed to unlink device from farm',
         name: 'FarmRepository',
         error: e,
         stackTrace: stackTrace,
@@ -246,7 +275,7 @@ class FarmRepository {
         stackTrace: stackTrace,
         level: 900,
       );
-      // Don't rethrow - this is a non-critical operation
+      // Non-critical — don't rethrow
     }
   }
 
@@ -267,7 +296,7 @@ class FarmRepository {
         stackTrace: stackTrace,
         level: 900,
       );
-      // Don't rethrow - this is a non-critical operation
+      // Non-critical — don't rethrow
     }
   }
 
@@ -458,7 +487,8 @@ class FarmRepository {
         flushNumber: Value(flushNumber),
         qualityScore: Value(qualityScore),
         notes: Value(notes),
-        photoUrls: Value(photoUrls != null ? _encodePhotoUrls(photoUrls) : null),
+        photoUrls:
+            Value(photoUrls != null ? _encodePhotoUrls(photoUrls) : null),
         metadata: Value(metadata != null ? _encodeMetadata(metadata) : null),
       );
 
@@ -529,17 +559,12 @@ class FarmRepository {
   // VALIDATION
   // ========================
 
-  /// Validate farm creation
-  void validateFarm({
-    required String name,
-    required String deviceId,
-  }) {
+  /// Validate farm creation.
+  ///
+  /// Only the name is required — device is optional.
+  void validateFarm({required String name}) {
     if (name.trim().isEmpty) {
       throw FarmValidationException('Farm name cannot be empty');
-    }
-
-    if (deviceId.trim().isEmpty) {
-      throw FarmValidationException('Device ID cannot be empty');
     }
   }
 
@@ -566,15 +591,16 @@ class FarmRepository {
     return models.Farm(
       id: farm.id,
       name: farm.name,
-      deviceId: farm.deviceId,
+      deviceId: farm.deviceId, // nullable — fine now that model accepts String?
       location: farm.location,
       notes: farm.notes,
       createdAt: farm.createdAt,
       lastActive: farm.lastActive,
       totalHarvests: farm.totalHarvests,
       totalYieldKg: farm.totalYieldKg,
-      primarySpecies:
-          farm.primarySpecies != null ? Species.fromId(farm.primarySpecies!) : null,
+      primarySpecies: farm.primarySpecies != null
+          ? Species.fromId(farm.primarySpecies!)
+          : null,
       imageUrl: farm.imageUrl,
       isActive: farm.isActive,
       metadata: farm.metadata != null ? _decodeMetadata(farm.metadata!) : null,
@@ -593,30 +619,33 @@ class FarmRepository {
       flushNumber: harvest.flushNumber,
       qualityScore: harvest.qualityScore,
       notes: harvest.notes,
-      photoUrls: harvest.photoUrls != null ? _decodePhotoUrls(harvest.photoUrls!) : null,
-      metadata: harvest.metadata != null ? _decodeMetadata(harvest.metadata!) : null,
+      photoUrls: harvest.photoUrls != null
+          ? _decodePhotoUrls(harvest.photoUrls!)
+          : null,
+      metadata:
+          harvest.metadata != null ? _decodeMetadata(harvest.metadata!) : null,
     );
   }
 
-  /// Encode metadata to string (JSON)
+  /// Encode metadata to JSON string
   String _encodeMetadata(Map<String, dynamic> metadata) {
     // In production, use json.encode()
     return metadata.toString();
   }
 
-  /// Decode metadata from string
+  /// Decode metadata from JSON string
   Map<String, dynamic> _decodeMetadata(String metadata) {
     // In production, use json.decode()
     return {};
   }
 
-  /// Encode photo URLs to string (JSON array)
+  /// Encode photo URLs to JSON array string
   String _encodePhotoUrls(List<String> photoUrls) {
     // In production, use json.encode()
     return photoUrls.join(',');
   }
 
-  /// Decode photo URLs from string
+  /// Decode photo URLs from JSON array string
   List<String> _decodePhotoUrls(String photoUrls) {
     // In production, use json.decode()
     return photoUrls.split(',');

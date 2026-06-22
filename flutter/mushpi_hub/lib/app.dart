@@ -142,12 +142,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                 name: 'farms',
                 builder: (context, state) => const HomeScreen(),
                 routes: [
-                  // Device scan screen
-                  GoRoute(
-                    path: 'scan',
-                    name: 'scan',
-                    builder: (context, state) => const DeviceScanScreen(),
-                  ),
+                  // // Device scan screen
+                  // GoRoute(
+                  //   path: 'history',
+                  //   name: 'history',
+                  //   builder: (context, state) => const HistoryScreen(),
+                  // ),
                   // History screen
                   GoRoute(
                     path: 'history',
@@ -222,6 +222,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           final farmId = state.pathParameters['id']!;
           return FarmDetailScreen(farmId: farmId);
         },
+        routes: [
+          GoRoute(
+            path: 'scan',
+            name: 'scan',
+            builder:(context, state) {
+              final farmId = state.pathParameters['id']!;
+              return DeviceScanScreen(farmId: farmId);
+            },
+          )
+        ]
       ),
     ],
 

@@ -19,7 +19,7 @@ import 'dart:developer' as developer;
 /// ```
 final farmRepositoryProvider = Provider<FarmRepository>((ref) {
   final database = ref.watch(databaseProvider);
-  
+
   developer.log(
     'Initializing FarmRepository',
     name: 'mushpi.providers.farms',
@@ -44,12 +44,12 @@ final farmRepositoryProvider = Provider<FarmRepository>((ref) {
 /// ```
 final allFarmsProvider = FutureProvider<List<Farm>>((ref) async {
   final repository = ref.watch(farmRepositoryProvider);
-  
+
   developer.log(
     'Fetching all farms',
     name: 'mushpi.providers.farms',
   );
-  
+
   return await repository.getAllFarms();
 });
 
@@ -68,12 +68,12 @@ final allFarmsProvider = FutureProvider<List<Farm>>((ref) async {
 /// ```
 final activeFarmsProvider = FutureProvider<List<Farm>>((ref) async {
   final repository = ref.watch(farmRepositoryProvider);
-  
+
   developer.log(
     'Fetching active farms',
     name: 'mushpi.providers.farms',
   );
-  
+
   return await repository.getActiveFarms();
 });
 
@@ -87,7 +87,7 @@ final activeFarmsProvider = FutureProvider<List<Farm>>((ref) async {
 /// ```
 final archivedFarmsProvider = FutureProvider<List<Farm>>((ref) async {
   final allFarms = await ref.watch(allFarmsProvider.future);
-  
+
   // Filter for archived farms (isActive = false)
   return allFarms.where((farm) => !farm.isActive).toList();
 });
@@ -105,17 +105,18 @@ final archivedFarmsProvider = FutureProvider<List<Farm>>((ref) async {
 ///   error: (err, stack) => Text('Error: $err'),
 /// );
 /// ```
-final farmByIdProvider = FutureProvider.family<Farm?, String>((ref, farmId) async {
+final farmByIdProvider =
+    FutureProvider.family<Farm?, String>((ref, farmId) async {
   final repository = ref.watch(farmRepositoryProvider);
-  
+
   developer.log(
     '🔍 [farmByIdProvider] Fetching farm by ID: $farmId',
     name: 'mushpi.providers.farms',
   );
-  
+
   try {
     final farm = await repository.getFarmById(farmId);
-    
+
     if (farm != null) {
       developer.log(
         '✅ [farmByIdProvider] Found farm: ${farm.name} (ID: ${farm.id}, Device: ${farm.deviceId})',
@@ -127,7 +128,7 @@ final farmByIdProvider = FutureProvider.family<Farm?, String>((ref, farmId) asyn
         name: 'mushpi.providers.farms',
         level: 900,
       );
-      
+
       // Debug: Log all farms to help diagnose
       final allFarms = await repository.getAllFarms();
       developer.log(
@@ -141,7 +142,7 @@ final farmByIdProvider = FutureProvider.family<Farm?, String>((ref, farmId) asyn
         );
       }
     }
-    
+
     return farm;
   } catch (error, stackTrace) {
     developer.log(
@@ -163,14 +164,15 @@ final farmByIdProvider = FutureProvider.family<Farm?, String>((ref, farmId) asyn
 /// ```dart
 /// final farm = ref.watch(farmByDeviceIdProvider('AA:BB:CC:DD:EE:FF'));
 /// ```
-final farmByDeviceIdProvider = FutureProvider.family<Farm?, String>((ref, deviceId) async {
+final farmByDeviceIdProvider =
+    FutureProvider.family<Farm?, String>((ref, deviceId) async {
   final repository = ref.watch(farmRepositoryProvider);
-  
+
   developer.log(
     'Fetching farm by device ID: $deviceId',
     name: 'mushpi.providers.farms',
   );
-  
+
   return await repository.getFarmByDeviceId(deviceId);
 });
 
@@ -180,7 +182,7 @@ final farmByDeviceIdProvider = FutureProvider.family<Farm?, String>((ref, device
 /// - Create, update, delete farms
 /// - Archive/restore farms
 /// - Record harvests
-/// - Link devices
+/// - Link/unlink devices
 /// - Update production metrics
 ///
 /// Usage:
@@ -207,11 +209,12 @@ class FarmOperations {
 
   /// Create a new farm
   ///
-  /// Creates a new farm and refreshes the farms list.
+  /// Creates a new farm without requiring a BLE device.
+  /// A device can be linked later via [updateFarmDevice].
   Future<String> createFarm({
     required String id,
     required String name,
-    required String deviceId,
+    String? deviceId, // optional — farm can exist without a device
     String? location,
     String? notes,
     Species? primarySpecies,
@@ -222,7 +225,7 @@ class FarmOperations {
         '🏗️ [FarmOperations] Creating farm...\n'
         '  Name: $name\n'
         '  ID: $id\n'
-        '  Device: $deviceId\n'
+        '  Device: ${deviceId ?? "none"}\n'
         '  Species: ${primarySpecies?.displayName ?? "None"}\n'
         '  Location: ${location ?? "None"}',
         name: 'mushpi.providers.farms.ops',
@@ -238,7 +241,6 @@ class FarmOperations {
         imageUrl: imageUrl,
       );
 
-      // Refresh farms list
       developer.log(
         '🔄 [FarmOperations] Refreshing farm providers after creation',
         name: 'mushpi.providers.farms.ops',
@@ -278,7 +280,7 @@ class FarmOperations {
     }
   }
 
-  /// Update an existing farm
+  /// Update an existing farm's metadata
   Future<void> updateFarm({
     required String id,
     String? name,
@@ -302,7 +304,6 @@ class FarmOperations {
         imageUrl: imageUrl,
       );
 
-      // Refresh farms list
       _refreshFarms();
 
       developer.log(
@@ -321,7 +322,47 @@ class FarmOperations {
     }
   }
 
-  /// Delete a farm
+  /// Link or unlink a BLE device from a farm.
+  ///
+  /// Pass a [deviceId] to associate a device, or null to remove
+  /// the current device association.
+  Future<void> updateFarmDevice({
+    required String farmId,
+    String? deviceId,
+  }) async {
+    try {
+      developer.log(
+        '🔗 [FarmOperations] Updating device for farm $farmId: ${deviceId ?? "none (unlinking)"}',
+        name: 'mushpi.providers.farms.ops',
+      );
+
+      if (deviceId != null) {
+        await repository.linkDeviceToFarm(farmId, deviceId);
+      } else {
+        await repository.unlinkDeviceFromFarm(farmId);
+      }
+
+      _refreshFarms();
+      // Also invalidate the specific farm so FarmDetailScreen updates
+      ref.invalidate(farmByIdProvider(farmId));
+
+      developer.log(
+        '✅ [FarmOperations] Successfully updated farm device',
+        name: 'mushpi.providers.farms.ops',
+      );
+    } catch (error, stackTrace) {
+      developer.log(
+        '❌ [FarmOperations] Failed to update farm device',
+        name: 'mushpi.providers.farms.ops',
+        error: error,
+        stackTrace: stackTrace,
+        level: 1000,
+      );
+      rethrow;
+    }
+  }
+
+  /// Delete a farm permanently
   Future<void> deleteFarm(String farmId) async {
     try {
       developer.log(
@@ -331,7 +372,6 @@ class FarmOperations {
 
       await repository.deleteFarm(farmId);
 
-      // Refresh farms list
       _refreshFarms();
 
       developer.log(
@@ -360,7 +400,6 @@ class FarmOperations {
 
       await repository.archiveFarm(farmId);
 
-      // Refresh farms list
       _refreshFarms();
 
       developer.log(
@@ -389,7 +428,6 @@ class FarmOperations {
 
       await repository.restoreFarm(farmId);
 
-      // Refresh farms list
       _refreshFarms();
 
       developer.log(
@@ -408,7 +446,7 @@ class FarmOperations {
     }
   }
 
-  /// Link a device to a farm
+  /// Link a device to a farm (legacy — prefer updateFarmDevice)
   Future<void> linkDeviceToFarm(String farmId, String deviceId) async {
     try {
       developer.log(
@@ -418,7 +456,6 @@ class FarmOperations {
 
       await repository.linkDeviceToFarm(farmId, deviceId);
 
-      // Refresh farms list
       _refreshFarms();
 
       developer.log(
@@ -441,8 +478,6 @@ class FarmOperations {
   Future<void> updateLastActive(String farmId) async {
     try {
       await repository.updateLastActive(farmId);
-
-      // Refresh farms list
       _refreshFarms();
     } catch (error, stackTrace) {
       developer.log(
@@ -459,8 +494,6 @@ class FarmOperations {
   Future<void> clearLastActive(String farmId) async {
     try {
       await repository.clearLastActive(farmId);
-
-      // Refresh farms list
       _refreshFarms();
     } catch (error, stackTrace) {
       developer.log(
@@ -592,7 +625,6 @@ class FarmOperations {
 
       await repository.recalculateProductionMetrics(farmId);
 
-      // Refresh farms list
       _refreshFarms();
 
       developer.log(
@@ -611,7 +643,7 @@ class FarmOperations {
     }
   }
 
-  /// Refresh all farm providers
+  /// Refresh all farm-related providers
   void _refreshFarms() {
     ref.invalidate(allFarmsProvider);
     ref.invalidate(activeFarmsProvider);
@@ -632,7 +664,8 @@ class FarmOperations {
 ///   error: (err, stack) => Text('Error: $err'),
 /// );
 /// ```
-final harvestsForFarmProvider = FutureProvider.family<List<HarvestRecord>, String>(
+final harvestsForFarmProvider =
+    FutureProvider.family<List<HarvestRecord>, String>(
   (ref, farmId) async {
     final farmOps = ref.watch(farmOperationsProvider);
     return await farmOps.getHarvestsForFarm(farmId);

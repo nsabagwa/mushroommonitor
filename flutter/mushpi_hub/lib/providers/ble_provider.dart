@@ -389,7 +389,7 @@ class BLEOperations {
         // Insert new device record
         await devicesDao.insertDevice(
           DevicesCompanion.insert(
-            deviceId: deviceId,
+            deviceId: Value(deviceId),
             name: device.platformName,
             address: device.remoteId.toString(),
             lastConnected: DateTime.now(),

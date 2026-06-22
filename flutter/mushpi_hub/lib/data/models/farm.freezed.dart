@@ -22,7 +22,7 @@ Farm _$FarmFromJson(Map<String, dynamic> json) {
 mixin _$Farm {
   String get id => throw _privateConstructorUsedError; // Unique farm ID (UUID)
   String get name => throw _privateConstructorUsedError; // User-defined name
-  String get deviceId =>
+  String? get deviceId =>
       throw _privateConstructorUsedError; // Linked MushPi device ID (one-to-one)
   String? get location =>
       throw _privateConstructorUsedError; // Optional location
@@ -61,7 +61,7 @@ abstract class $FarmCopyWith<$Res> {
   $Res call(
       {String id,
       String name,
-      String deviceId,
+      String? deviceId,
       String? location,
       String? notes,
       DateTime createdAt,
@@ -91,7 +91,7 @@ class _$FarmCopyWithImpl<$Res, $Val extends Farm>
   $Res call({
     Object? id = null,
     Object? name = null,
-    Object? deviceId = null,
+    Object? deviceId = freezed,
     Object? location = freezed,
     Object? notes = freezed,
     Object? createdAt = null,
@@ -112,10 +112,10 @@ class _$FarmCopyWithImpl<$Res, $Val extends Farm>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
-      deviceId: null == deviceId
+      deviceId: freezed == deviceId
           ? _value.deviceId
           : deviceId // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
       location: freezed == location
           ? _value.location
           : location // ignore: cast_nullable_to_non_nullable
@@ -170,7 +170,7 @@ abstract class _$$FarmImplCopyWith<$Res> implements $FarmCopyWith<$Res> {
   $Res call(
       {String id,
       String name,
-      String deviceId,
+      String? deviceId,
       String? location,
       String? notes,
       DateTime createdAt,
@@ -197,7 +197,7 @@ class __$$FarmImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? name = null,
-    Object? deviceId = null,
+    Object? deviceId = freezed,
     Object? location = freezed,
     Object? notes = freezed,
     Object? createdAt = null,
@@ -218,10 +218,10 @@ class __$$FarmImplCopyWithImpl<$Res>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
-      deviceId: null == deviceId
+      deviceId: freezed == deviceId
           ? _value.deviceId
           : deviceId // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
       location: freezed == location
           ? _value.location
           : location // ignore: cast_nullable_to_non_nullable
@@ -272,7 +272,7 @@ class _$FarmImpl implements _Farm {
   const _$FarmImpl(
       {required this.id,
       required this.name,
-      required this.deviceId,
+      this.deviceId,
       this.location,
       this.notes,
       required this.createdAt,
@@ -295,7 +295,7 @@ class _$FarmImpl implements _Farm {
   final String name;
 // User-defined name
   @override
-  final String deviceId;
+  final String? deviceId;
 // Linked MushPi device ID (one-to-one)
   @override
   final String? location;
@@ -410,7 +410,7 @@ abstract class _Farm implements Farm {
   const factory _Farm(
       {required final String id,
       required final String name,
-      required final String deviceId,
+      final String? deviceId,
       final String? location,
       final String? notes,
       required final DateTime createdAt,
@@ -429,7 +429,7 @@ abstract class _Farm implements Farm {
   @override
   String get name; // User-defined name
   @override
-  String get deviceId; // Linked MushPi device ID (one-to-one)
+  String? get deviceId; // Linked MushPi device ID (one-to-one)
   @override
   String? get location; // Optional location
   @override
@@ -1816,7 +1816,8 @@ DeviceInfo _$DeviceInfoFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$DeviceInfo {
-  String get deviceId => throw _privateConstructorUsedError;
+  String? get deviceId =>
+      throw _privateConstructorUsedError; //null = no device linked yet
   String get name => throw _privateConstructorUsedError;
   String get address => throw _privateConstructorUsedError;
   String? get farmId => throw _privateConstructorUsedError;
@@ -1839,7 +1840,7 @@ abstract class $DeviceInfoCopyWith<$Res> {
       _$DeviceInfoCopyWithImpl<$Res, DeviceInfo>;
   @useResult
   $Res call(
-      {String deviceId,
+      {String? deviceId,
       String name,
       String address,
       String? farmId,
@@ -1861,17 +1862,17 @@ class _$DeviceInfoCopyWithImpl<$Res, $Val extends DeviceInfo>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? deviceId = null,
+    Object? deviceId = freezed,
     Object? name = null,
     Object? address = null,
     Object? farmId = freezed,
     Object? lastConnected = freezed,
   }) {
     return _then(_value.copyWith(
-      deviceId: null == deviceId
+      deviceId: freezed == deviceId
           ? _value.deviceId
           : deviceId // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
       name: null == name
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
@@ -1901,7 +1902,7 @@ abstract class _$$DeviceInfoImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {String deviceId,
+      {String? deviceId,
       String name,
       String address,
       String? farmId,
@@ -1921,17 +1922,17 @@ class __$$DeviceInfoImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? deviceId = null,
+    Object? deviceId = freezed,
     Object? name = null,
     Object? address = null,
     Object? farmId = freezed,
     Object? lastConnected = freezed,
   }) {
     return _then(_$DeviceInfoImpl(
-      deviceId: null == deviceId
+      deviceId: freezed == deviceId
           ? _value.deviceId
           : deviceId // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
       name: null == name
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
@@ -1956,7 +1957,7 @@ class __$$DeviceInfoImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$DeviceInfoImpl implements _DeviceInfo {
   const _$DeviceInfoImpl(
-      {required this.deviceId,
+      {this.deviceId,
       required this.name,
       required this.address,
       this.farmId,
@@ -1966,7 +1967,8 @@ class _$DeviceInfoImpl implements _DeviceInfo {
       _$$DeviceInfoImplFromJson(json);
 
   @override
-  final String deviceId;
+  final String? deviceId;
+//null = no device linked yet
   @override
   final String name;
   @override
@@ -2018,7 +2020,7 @@ class _$DeviceInfoImpl implements _DeviceInfo {
 
 abstract class _DeviceInfo implements DeviceInfo {
   const factory _DeviceInfo(
-      {required final String deviceId,
+      {final String? deviceId,
       required final String name,
       required final String address,
       final String? farmId,
@@ -2028,7 +2030,7 @@ abstract class _DeviceInfo implements DeviceInfo {
       _$DeviceInfoImpl.fromJson;
 
   @override
-  String get deviceId;
+  String? get deviceId; //null = no device linked yet
   @override
   String get name;
   @override

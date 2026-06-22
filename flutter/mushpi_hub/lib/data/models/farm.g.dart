@@ -9,7 +9,7 @@ part of 'farm.dart';
 _$FarmImpl _$$FarmImplFromJson(Map<String, dynamic> json) => _$FarmImpl(
       id: json['id'] as String,
       name: json['name'] as String,
-      deviceId: json['deviceId'] as String,
+      deviceId: json['deviceId'] as String?,
       location: json['location'] as String?,
       notes: json['notes'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
@@ -175,7 +175,7 @@ Map<String, dynamic> _$$CrossFarmComparisonImplToJson(
 
 _$DeviceInfoImpl _$$DeviceInfoImplFromJson(Map<String, dynamic> json) =>
     _$DeviceInfoImpl(
-      deviceId: json['deviceId'] as String,
+      deviceId: json['deviceId'] as String?,
       name: json['name'] as String,
       address: json['address'] as String,
       farmId: json['farmId'] as String?,

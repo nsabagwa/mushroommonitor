@@ -24,7 +24,10 @@ const _uuid = Uuid();
 /// - Farm creation wizard with species auto-detection
 /// - Filters for MushPi devices only
 class DeviceScanScreen extends ConsumerStatefulWidget {
-  const DeviceScanScreen({super.key});
+
+  final String farmId; //Which farm we are linking a device to
+
+  const DeviceScanScreen({super.key, required this.farmId});
 
   @override
   ConsumerState<DeviceScanScreen> createState() => _DeviceScanScreenState();
@@ -112,18 +115,19 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
 
     if (!mounted) return;
 
-    final created = await showDialog<bool>(
+    final associated = await showDialog<bool>(
       context: context,
-      builder: (context) => _FarmCreationDialog(
+      builder: (context) => _DeviceAssociationDialog(
         device: result.device,
+        farmId: widget.farmId,
         detectedSpecies: detectedSpecies,
       ),
     );
 
     // Resume scanning if farm wasn't created
-    if (created != true && mounted) {
+    if (associated != true && mounted) {
       await _startScanning();
-    } else if (created == true && mounted) {
+    } else if (associated == true && mounted) {
       // Navigate back to home on success
       context.go('/farms');
     }
@@ -429,20 +433,22 @@ class _DeviceListItem extends StatelessWidget {
 }
 
 /// Farm creation dialog
-class _FarmCreationDialog extends ConsumerStatefulWidget {
+class _DeviceAssociationDialog extends ConsumerStatefulWidget {
   final BluetoothDevice device;
   final Species? detectedSpecies;
+  final String farmId;
 
-  const _FarmCreationDialog({
+  const _DeviceAssociationDialog({
     required this.device,
+    required this.farmId,
     this.detectedSpecies,
   });
 
   @override
-  ConsumerState<_FarmCreationDialog> createState() => _FarmCreationDialogState();
+  ConsumerState<_DeviceAssociationDialog> createState() => _FarmCreationDialogState();
 }
 
-class _FarmCreationDialogState extends ConsumerState<_FarmCreationDialog> {
+class _FarmCreationDialogState extends ConsumerState<_DeviceAssociationDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _locationController = TextEditingController();
@@ -466,7 +472,8 @@ class _FarmCreationDialogState extends ConsumerState<_FarmCreationDialog> {
   }
 
   /// Create new farm and link device
-  Future<void> _createFarm() async {
+  /// UPDATE: _associateDevice no longer needs to handle farm creation logic
+  Future<void> _associateDevice() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isCreating = true);
@@ -485,33 +492,38 @@ class _FarmCreationDialogState extends ConsumerState<_FarmCreationDialog> {
         name: 'device_scan',
       );
 
-      // Create farm with generated UUID
-      final createdFarmId = await operations.createFarm(
-        id: farmId,
-        name: _nameController.text.trim(),
-        deviceId: widget.device.remoteId.str,
-        location: _locationController.text.trim().isEmpty 
-            ? null 
-            : _locationController.text.trim(),
-        primarySpecies: _selectedSpecies,
-      );
+      // // Create farm with generated UUID
+      // final createdFarmId = await operations._associateDevice(
+      //   id: farmId,
+      //   name: _nameController.text.trim(),
+      //   deviceId: widget.device.remoteId.str,
+      //   location: _locationController.text.trim().isEmpty 
+      //       ? null 
+      //       : _locationController.text.trim(),
+      //   primarySpecies: _selectedSpecies,
+      // );
 
-      developer.log(
-        '✅ [_FarmCreationDialog] Farm created successfully!\n'
-        '  ID: $createdFarmId\n'
-        '  Device: ${widget.device.platformName}',
-        name: 'device_scan',
-      );
+      // developer.log(
+      //   '✅ [_FarmCreationDialog] Farm created successfully!\n'
+      //   '  ID: $createdFarmId\n'
+      //   '  Device: ${widget.device.platformName}',
+      //   name: 'device_scan',
+      // );
 
-      // Automatically connect to the device after farm creation
-      developer.log(
-        '🔗 [_FarmCreationDialog] Connecting to device automatically...',
-        name: 'device_scan',
-      );
+      // // Automatically connect to the device after farm creation
+      // developer.log(
+      //   '🔗 [_FarmCreationDialog] Connecting to device automatically...',
+      //   name: 'device_scan',
+      // );
       
+      await operations.updateFarmDevice(
+        farmId: widget.farmId, 
+        deviceId: widget.device.remoteId.str,
+        );
+
       try {
         final bleOps = ref.read(bleOperationsProvider);
-        await bleOps.connect(widget.device, farmId: createdFarmId);
+        await bleOps.connect(widget.device, farmId: widget.farmId);
         
         developer.log(
           '✅ [_FarmCreationDialog] Device connected successfully!',
@@ -678,7 +690,7 @@ class _FarmCreationDialogState extends ConsumerState<_FarmCreationDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _isCreating ? null : _createFarm,
+          onPressed: _isCreating ? null : _associateDevice,
           child: _isCreating
               ? const SizedBox(
                   width: 16,
