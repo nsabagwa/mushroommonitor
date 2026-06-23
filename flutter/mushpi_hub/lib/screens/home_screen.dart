@@ -24,17 +24,8 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Farms'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.cloud),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => const _ThingSpeakTestDialog(),
-              );
-            },
-          ),
-          const ThemeToggleButton(),
+        actions: const [
+          ThemeToggleButton(),
         ],
       ),
       body: farmsAsync.when(
@@ -425,16 +416,22 @@ class _StatItem extends StatelessWidget {
 // ThingSpeak test dialog (temporary)
 // ---------------------------------------------------------------------------
 
+// ignore: unused_element
 class _ThingSpeakTestDialog extends ConsumerWidget {
-  const _ThingSpeakTestDialog();
+  const _ThingSpeakTestDialog({required this.farm});
+  final Farm farm;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncData = ref.watch(thingSpeakProvider);
+    final hasThingSpeak = farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
+    final thingSpeakAsync = hasThingSpeak ? ref.watch(thingSpeakProvider((
+      channelId: farm.thingSpeakChannelId!,
+      readApiKey: farm.thingSpeakReadApiKey!,
+    ))) : const AsyncValue<ThingSpeakReading>.loading();
 
     return AlertDialog(
       title: const Text('ThingSpeak Test'),
-      content: asyncData.when(
+      content: thingSpeakAsync.when(
         data: (reading) => Column(
           mainAxisSize: MainAxisSize.min,
           children: [

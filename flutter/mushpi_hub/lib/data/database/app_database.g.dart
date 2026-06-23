@@ -37,6 +37,18 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
       'notes', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _thingSpeakChannelIdMeta =
+      const VerificationMeta('thingSpeakChannelId');
+  @override
+  late final GeneratedColumn<String> thingSpeakChannelId =
+      GeneratedColumn<String>('thing_speak_channel_id', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _thingSpeakReadApiKeyMeta =
+      const VerificationMeta('thingSpeakReadApiKey');
+  @override
+  late final GeneratedColumn<String> thingSpeakReadApiKey =
+      GeneratedColumn<String>('thing_speak_read_api_key', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -100,6 +112,8 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
         deviceId,
         location,
         notes,
+        thingSpeakChannelId,
+        thingSpeakReadApiKey,
         createdAt,
         lastActive,
         totalHarvests,
@@ -141,6 +155,18 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
     if (data.containsKey('notes')) {
       context.handle(
           _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
+    }
+    if (data.containsKey('thing_speak_channel_id')) {
+      context.handle(
+          _thingSpeakChannelIdMeta,
+          thingSpeakChannelId.isAcceptableOrUnknown(
+              data['thing_speak_channel_id']!, _thingSpeakChannelIdMeta));
+    }
+    if (data.containsKey('thing_speak_read_api_key')) {
+      context.handle(
+          _thingSpeakReadApiKeyMeta,
+          thingSpeakReadApiKey.isAcceptableOrUnknown(
+              data['thing_speak_read_api_key']!, _thingSpeakReadApiKeyMeta));
     }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
@@ -203,6 +229,12 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
           .read(DriftSqlType.string, data['${effectivePrefix}location']),
       notes: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      thingSpeakChannelId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}thing_speak_channel_id']),
+      thingSpeakReadApiKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}thing_speak_read_api_key']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       lastActive: attachedDatabase.typeMapping
@@ -234,6 +266,8 @@ class Farm extends DataClass implements Insertable<Farm> {
   final String? deviceId;
   final String? location;
   final String? notes;
+  final String? thingSpeakChannelId;
+  final String? thingSpeakReadApiKey;
   final DateTime createdAt;
   final DateTime? lastActive;
   final int totalHarvests;
@@ -248,6 +282,8 @@ class Farm extends DataClass implements Insertable<Farm> {
       this.deviceId,
       this.location,
       this.notes,
+      this.thingSpeakChannelId,
+      this.thingSpeakReadApiKey,
       required this.createdAt,
       this.lastActive,
       required this.totalHarvests,
@@ -269,6 +305,12 @@ class Farm extends DataClass implements Insertable<Farm> {
     }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || thingSpeakChannelId != null) {
+      map['thing_speak_channel_id'] = Variable<String>(thingSpeakChannelId);
+    }
+    if (!nullToAbsent || thingSpeakReadApiKey != null) {
+      map['thing_speak_read_api_key'] = Variable<String>(thingSpeakReadApiKey);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || lastActive != null) {
@@ -301,6 +343,12 @@ class Farm extends DataClass implements Insertable<Farm> {
           : Value(location),
       notes:
           notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      thingSpeakChannelId: thingSpeakChannelId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(thingSpeakChannelId),
+      thingSpeakReadApiKey: thingSpeakReadApiKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(thingSpeakReadApiKey),
       createdAt: Value(createdAt),
       lastActive: lastActive == null && nullToAbsent
           ? const Value.absent()
@@ -329,6 +377,10 @@ class Farm extends DataClass implements Insertable<Farm> {
       deviceId: serializer.fromJson<String?>(json['deviceId']),
       location: serializer.fromJson<String?>(json['location']),
       notes: serializer.fromJson<String?>(json['notes']),
+      thingSpeakChannelId:
+          serializer.fromJson<String?>(json['thingSpeakChannelId']),
+      thingSpeakReadApiKey:
+          serializer.fromJson<String?>(json['thingSpeakReadApiKey']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       lastActive: serializer.fromJson<DateTime?>(json['lastActive']),
       totalHarvests: serializer.fromJson<int>(json['totalHarvests']),
@@ -348,6 +400,8 @@ class Farm extends DataClass implements Insertable<Farm> {
       'deviceId': serializer.toJson<String?>(deviceId),
       'location': serializer.toJson<String?>(location),
       'notes': serializer.toJson<String?>(notes),
+      'thingSpeakChannelId': serializer.toJson<String?>(thingSpeakChannelId),
+      'thingSpeakReadApiKey': serializer.toJson<String?>(thingSpeakReadApiKey),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'lastActive': serializer.toJson<DateTime?>(lastActive),
       'totalHarvests': serializer.toJson<int>(totalHarvests),
@@ -365,6 +419,8 @@ class Farm extends DataClass implements Insertable<Farm> {
           Value<String?> deviceId = const Value.absent(),
           Value<String?> location = const Value.absent(),
           Value<String?> notes = const Value.absent(),
+          Value<String?> thingSpeakChannelId = const Value.absent(),
+          Value<String?> thingSpeakReadApiKey = const Value.absent(),
           DateTime? createdAt,
           Value<DateTime?> lastActive = const Value.absent(),
           int? totalHarvests,
@@ -379,6 +435,12 @@ class Farm extends DataClass implements Insertable<Farm> {
         deviceId: deviceId.present ? deviceId.value : this.deviceId,
         location: location.present ? location.value : this.location,
         notes: notes.present ? notes.value : this.notes,
+        thingSpeakChannelId: thingSpeakChannelId.present
+            ? thingSpeakChannelId.value
+            : this.thingSpeakChannelId,
+        thingSpeakReadApiKey: thingSpeakReadApiKey.present
+            ? thingSpeakReadApiKey.value
+            : this.thingSpeakReadApiKey,
         createdAt: createdAt ?? this.createdAt,
         lastActive: lastActive.present ? lastActive.value : this.lastActive,
         totalHarvests: totalHarvests ?? this.totalHarvests,
@@ -396,6 +458,12 @@ class Farm extends DataClass implements Insertable<Farm> {
       deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
       location: data.location.present ? data.location.value : this.location,
       notes: data.notes.present ? data.notes.value : this.notes,
+      thingSpeakChannelId: data.thingSpeakChannelId.present
+          ? data.thingSpeakChannelId.value
+          : this.thingSpeakChannelId,
+      thingSpeakReadApiKey: data.thingSpeakReadApiKey.present
+          ? data.thingSpeakReadApiKey.value
+          : this.thingSpeakReadApiKey,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       lastActive:
           data.lastActive.present ? data.lastActive.value : this.lastActive,
@@ -422,6 +490,8 @@ class Farm extends DataClass implements Insertable<Farm> {
           ..write('deviceId: $deviceId, ')
           ..write('location: $location, ')
           ..write('notes: $notes, ')
+          ..write('thingSpeakChannelId: $thingSpeakChannelId, ')
+          ..write('thingSpeakReadApiKey: $thingSpeakReadApiKey, ')
           ..write('createdAt: $createdAt, ')
           ..write('lastActive: $lastActive, ')
           ..write('totalHarvests: $totalHarvests, ')
@@ -441,6 +511,8 @@ class Farm extends DataClass implements Insertable<Farm> {
       deviceId,
       location,
       notes,
+      thingSpeakChannelId,
+      thingSpeakReadApiKey,
       createdAt,
       lastActive,
       totalHarvests,
@@ -458,6 +530,8 @@ class Farm extends DataClass implements Insertable<Farm> {
           other.deviceId == this.deviceId &&
           other.location == this.location &&
           other.notes == this.notes &&
+          other.thingSpeakChannelId == this.thingSpeakChannelId &&
+          other.thingSpeakReadApiKey == this.thingSpeakReadApiKey &&
           other.createdAt == this.createdAt &&
           other.lastActive == this.lastActive &&
           other.totalHarvests == this.totalHarvests &&
@@ -474,6 +548,8 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
   final Value<String?> deviceId;
   final Value<String?> location;
   final Value<String?> notes;
+  final Value<String?> thingSpeakChannelId;
+  final Value<String?> thingSpeakReadApiKey;
   final Value<DateTime> createdAt;
   final Value<DateTime?> lastActive;
   final Value<int> totalHarvests;
@@ -489,6 +565,8 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     this.deviceId = const Value.absent(),
     this.location = const Value.absent(),
     this.notes = const Value.absent(),
+    this.thingSpeakChannelId = const Value.absent(),
+    this.thingSpeakReadApiKey = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.lastActive = const Value.absent(),
     this.totalHarvests = const Value.absent(),
@@ -505,6 +583,8 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     this.deviceId = const Value.absent(),
     this.location = const Value.absent(),
     this.notes = const Value.absent(),
+    this.thingSpeakChannelId = const Value.absent(),
+    this.thingSpeakReadApiKey = const Value.absent(),
     required DateTime createdAt,
     this.lastActive = const Value.absent(),
     this.totalHarvests = const Value.absent(),
@@ -523,6 +603,8 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     Expression<String>? deviceId,
     Expression<String>? location,
     Expression<String>? notes,
+    Expression<String>? thingSpeakChannelId,
+    Expression<String>? thingSpeakReadApiKey,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? lastActive,
     Expression<int>? totalHarvests,
@@ -539,6 +621,10 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
       if (deviceId != null) 'device_id': deviceId,
       if (location != null) 'location': location,
       if (notes != null) 'notes': notes,
+      if (thingSpeakChannelId != null)
+        'thing_speak_channel_id': thingSpeakChannelId,
+      if (thingSpeakReadApiKey != null)
+        'thing_speak_read_api_key': thingSpeakReadApiKey,
       if (createdAt != null) 'created_at': createdAt,
       if (lastActive != null) 'last_active': lastActive,
       if (totalHarvests != null) 'total_harvests': totalHarvests,
@@ -557,6 +643,8 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
       Value<String?>? deviceId,
       Value<String?>? location,
       Value<String?>? notes,
+      Value<String?>? thingSpeakChannelId,
+      Value<String?>? thingSpeakReadApiKey,
       Value<DateTime>? createdAt,
       Value<DateTime?>? lastActive,
       Value<int>? totalHarvests,
@@ -572,6 +660,8 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
       deviceId: deviceId ?? this.deviceId,
       location: location ?? this.location,
       notes: notes ?? this.notes,
+      thingSpeakChannelId: thingSpeakChannelId ?? this.thingSpeakChannelId,
+      thingSpeakReadApiKey: thingSpeakReadApiKey ?? this.thingSpeakReadApiKey,
       createdAt: createdAt ?? this.createdAt,
       lastActive: lastActive ?? this.lastActive,
       totalHarvests: totalHarvests ?? this.totalHarvests,
@@ -601,6 +691,14 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
+    }
+    if (thingSpeakChannelId.present) {
+      map['thing_speak_channel_id'] =
+          Variable<String>(thingSpeakChannelId.value);
+    }
+    if (thingSpeakReadApiKey.present) {
+      map['thing_speak_read_api_key'] =
+          Variable<String>(thingSpeakReadApiKey.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -640,6 +738,8 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
           ..write('deviceId: $deviceId, ')
           ..write('location: $location, ')
           ..write('notes: $notes, ')
+          ..write('thingSpeakChannelId: $thingSpeakChannelId, ')
+          ..write('thingSpeakReadApiKey: $thingSpeakReadApiKey, ')
           ..write('createdAt: $createdAt, ')
           ..write('lastActive: $lastActive, ')
           ..write('totalHarvests: $totalHarvests, ')
@@ -2165,6 +2265,8 @@ typedef $$FarmsTableCreateCompanionBuilder = FarmsCompanion Function({
   Value<String?> deviceId,
   Value<String?> location,
   Value<String?> notes,
+  Value<String?> thingSpeakChannelId,
+  Value<String?> thingSpeakReadApiKey,
   required DateTime createdAt,
   Value<DateTime?> lastActive,
   Value<int> totalHarvests,
@@ -2181,6 +2283,8 @@ typedef $$FarmsTableUpdateCompanionBuilder = FarmsCompanion Function({
   Value<String?> deviceId,
   Value<String?> location,
   Value<String?> notes,
+  Value<String?> thingSpeakChannelId,
+  Value<String?> thingSpeakReadApiKey,
   Value<DateTime> createdAt,
   Value<DateTime?> lastActive,
   Value<int> totalHarvests,
@@ -2261,6 +2365,14 @@ class $$FarmsTableFilterComposer extends Composer<_$AppDatabase, $FarmsTable> {
 
   ColumnFilters<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get thingSpeakChannelId => $composableBuilder(
+      column: $table.thingSpeakChannelId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get thingSpeakReadApiKey => $composableBuilder(
+      column: $table.thingSpeakReadApiKey,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -2375,6 +2487,14 @@ class $$FarmsTableOrderingComposer
   ColumnOrderings<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get thingSpeakChannelId => $composableBuilder(
+      column: $table.thingSpeakChannelId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get thingSpeakReadApiKey => $composableBuilder(
+      column: $table.thingSpeakReadApiKey,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -2426,6 +2546,12 @@ class $$FarmsTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get thingSpeakChannelId => $composableBuilder(
+      column: $table.thingSpeakChannelId, builder: (column) => column);
+
+  GeneratedColumn<String> get thingSpeakReadApiKey => $composableBuilder(
+      column: $table.thingSpeakReadApiKey, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2544,6 +2670,8 @@ class $$FarmsTableTableManager extends RootTableManager<
             Value<String?> deviceId = const Value.absent(),
             Value<String?> location = const Value.absent(),
             Value<String?> notes = const Value.absent(),
+            Value<String?> thingSpeakChannelId = const Value.absent(),
+            Value<String?> thingSpeakReadApiKey = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime?> lastActive = const Value.absent(),
             Value<int> totalHarvests = const Value.absent(),
@@ -2560,6 +2688,8 @@ class $$FarmsTableTableManager extends RootTableManager<
             deviceId: deviceId,
             location: location,
             notes: notes,
+            thingSpeakChannelId: thingSpeakChannelId,
+            thingSpeakReadApiKey: thingSpeakReadApiKey,
             createdAt: createdAt,
             lastActive: lastActive,
             totalHarvests: totalHarvests,
@@ -2576,6 +2706,8 @@ class $$FarmsTableTableManager extends RootTableManager<
             Value<String?> deviceId = const Value.absent(),
             Value<String?> location = const Value.absent(),
             Value<String?> notes = const Value.absent(),
+            Value<String?> thingSpeakChannelId = const Value.absent(),
+            Value<String?> thingSpeakReadApiKey = const Value.absent(),
             required DateTime createdAt,
             Value<DateTime?> lastActive = const Value.absent(),
             Value<int> totalHarvests = const Value.absent(),
@@ -2592,6 +2724,8 @@ class $$FarmsTableTableManager extends RootTableManager<
             deviceId: deviceId,
             location: location,
             notes: notes,
+            thingSpeakChannelId: thingSpeakChannelId,
+            thingSpeakReadApiKey: thingSpeakReadApiKey,
             createdAt: createdAt,
             lastActive: lastActive,
             totalHarvests: totalHarvests,

@@ -1404,6 +1404,174 @@
           "grade": "B"
         }
       }
+    },
+    {
+      "timestamp": "2026-06-23T05:45:01.613Z",
+      "extensionVersion": "14.0.7",
+      "packages": {
+        "build_runner": {
+          "version": "2.5.4",
+          "score": 75.6,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "drift": {
+          "version": "2.28.2",
+          "score": 84.3,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "drift_dev": {
+          "version": "2.28.0",
+          "score": 73.7,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "fl_chart": {
+          "version": "0.65.0",
+          "score": 61.9,
+          "category": "stable",
+          "grade": "B"
+        },
+        "flutter_blue_plus": {
+          "version": "1.36.8",
+          "score": 72.2,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "flutter_dotenv": {
+          "version": "5.2.1",
+          "score": 49.1,
+          "category": "stable",
+          "grade": "B"
+        },
+        "flutter_hooks": {
+          "version": "0.20.5",
+          "score": 40.1,
+          "category": "end-of-life",
+          "grade": "F"
+        },
+        "flutter_lints": {
+          "version": "3.0.2",
+          "score": 54.1,
+          "category": "stable",
+          "grade": "B"
+        },
+        "flutter_riverpod": {
+          "version": "2.6.1",
+          "score": 84.7,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "freezed": {
+          "version": "2.5.8",
+          "score": 69,
+          "category": "stable",
+          "grade": "B"
+        },
+        "freezed_annotation": {
+          "version": "2.4.4",
+          "score": 67.4,
+          "category": "stable",
+          "grade": "B"
+        },
+        "go_router": {
+          "version": "12.1.3",
+          "score": 60.6,
+          "category": "stable",
+          "grade": "B"
+        },
+        "google_fonts": {
+          "version": "6.3.3",
+          "score": 56.6,
+          "category": "stable",
+          "grade": "B"
+        },
+        "hooks_riverpod": {
+          "version": "2.6.1",
+          "score": 86.6,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "http": {
+          "version": "1.6.0",
+          "score": 73.5,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "intl": {
+          "version": "0.19.0",
+          "score": 66.6,
+          "category": "stable",
+          "grade": "B"
+        },
+        "json_annotation": {
+          "version": "4.9.0",
+          "score": 52.6,
+          "category": "stable",
+          "grade": "B"
+        },
+        "json_serializable": {
+          "version": "6.9.5",
+          "score": 61,
+          "category": "stable",
+          "grade": "B"
+        },
+        "mockito": {
+          "version": "5.4.6",
+          "score": 79.9,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "path": {
+          "version": "1.9.1",
+          "score": 45.2,
+          "category": "stable",
+          "grade": "B"
+        },
+        "path_provider": {
+          "version": "2.1.6",
+          "score": 56.6,
+          "category": "stable",
+          "grade": "B"
+        },
+        "permission_handler": {
+          "version": "11.4.0",
+          "score": 74.7,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "riverpod_annotation": {
+          "version": "2.6.1",
+          "score": 78.8,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "riverpod_generator": {
+          "version": "2.6.4",
+          "score": 81.3,
+          "category": "vibrant",
+          "grade": "A"
+        },
+        "sqlite3_flutter_libs": {
+          "version": "0.5.42",
+          "score": 54.7,
+          "category": "stable",
+          "grade": "B"
+        },
+        "url_launcher": {
+          "version": "6.3.2",
+          "score": 56.6,
+          "category": "stable",
+          "grade": "B"
+        },
+        "uuid": {
+          "version": "4.5.3",
+          "score": 63.8,
+          "category": "stable",
+          "grade": "B"
+        }
+      }
     }
   ]
 }

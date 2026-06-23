@@ -29,23 +29,42 @@ class ThingSpeakReading {
       light: double.tryParse(feed['field4'] ?? ''),
     );
   }
+
+  /// Which fields have actual data -used for sensor discovery
+  List<String> get availableSensors {
+    return [
+      if (temperature != null) 'Temperature',
+      if (humidity != null) 'Humidity',
+      if (co2 != null) 'CO2',
+      if (light != null) 'Light',
+    ];
+  }
 }
 
-final thingSpeakProvider = StreamProvider.autoDispose<ThingSpeakReading>((ref) {
-  const channelId = '3386816';
-  const readApiKey = 'GR8NEFEZGVW3SG4X';
+/// Fetch a single reading - used for testing credentials before saving
+Future<ThingSpeakReading> fetchThingSpeakOnce ({
+  required String channelId,
+  required String readApiKey,
+}) async {
+  final url = Uri.parse(
+    'https://api.thingspeak.com/channels/$channelId/feeds.json'
+    '?api_key=$readApiKey&results=1',
+  );
+  final response = await http.get(url).timeout(const Duration(seconds: 10));
+  if (response.statusCode == 200) {
+    return ThingSpeakReading.fromJson(jsonDecode(response.body));
+  } else {
+    throw Exception('HTTP ${response.statusCode} -- check channel ID and API key');
+  }
+}
+
+final thingSpeakProvider = StreamProvider.autoDispose.family<ThingSpeakReading, ({String channelId, String readApiKey})>((ref, credentials) {
+  /// Avoiding hardcoding of constants!
+  // const channelId = '🗏︎🗏︎🖰︎⌛︎🖰︎📂︎⌛︎';
+  // const readApiKey = '☝︎☼︎🖰︎☠︎☜︎☞︎☜︎☪︎☝︎✞︎🕈︎🗏︎💧︎☝︎🗐︎✠︎';
 
   return Stream.periodic(const Duration(seconds: 30), (_) => null)
-      .asyncMap((_) async {
-    final url = Uri.parse(
-      'https://api.thingspeak.com/channels/$channelId/feeds.json'
-      '?api_key=$readApiKey&results=1',
-    );
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      return ThingSpeakReading.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('HTTP ${response.statusCode}');
-    }
-  });
+      .asyncMap((_) => fetchThingSpeakOnce(
+        channelId: credentials.channelId,
+        readApiKey: credentials.readApiKey));
 });

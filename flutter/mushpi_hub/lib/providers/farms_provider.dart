@@ -215,6 +215,8 @@ class FarmOperations {
     required String id,
     required String name,
     String? deviceId, // optional — farm can exist without a device
+    String? thingSpeakChannelId,
+    String? thingSpeakReadApiKey,
     String? location,
     String? notes,
     Species? primarySpecies,
@@ -278,6 +280,31 @@ class FarmOperations {
       );
       rethrow;
     }
+  }
+
+  /// Add ThingSpeak as an optional feature for remote monitoring
+  Future<void> updateThingSpeak({
+    required String farmId,
+    String? channelId,
+    String? apiKey,
+  }) async {
+    try {
+      await repository.updateThingSpeak(
+      farmId: farmId,
+      channelId: channelId,
+      readApiKey: apiKey,
+      );
+      _refreshFarms();
+      ref.invalidate(farmByIdProvider(farmId));
+      } catch (e, stackTrace) {
+        developer.log(
+          "Failed to update ThingSpeak", 
+          name: "mushpi.providers.farm.ops", 
+          error: e, 
+          stackTrace: stackTrace, 
+          level: 1000);
+        rethrow;
+      }
   }
 
   /// Update an existing farm's metadata

@@ -82,4 +82,15 @@ class FarmsDao extends DatabaseAccessor<AppDatabase> with _$FarmsDaoMixin {
     return (update(farms)..where((f) => f.id.equals(farmId)))
         .write(FarmsCompanion(deviceId: Value(deviceId)));
   }
+
+  // Link farm to ThingSpeak
+  Future<int> updateThingSpeak(
+    String farmId,
+    String? channelId,
+    String? readApiKey,
+  ) async {
+    return (update(farms)..where((f) => f.id.equals(farmId)))
+        .write(FarmsCompanion(thingSpeakChannelId: Value(channelId), thingSpeakReadApiKey: Value(readApiKey)));
+  }
+  
 }

@@ -11,6 +11,8 @@ _$FarmImpl _$$FarmImplFromJson(Map<String, dynamic> json) => _$FarmImpl(
       name: json['name'] as String,
       deviceId: json['deviceId'] as String?,
       location: json['location'] as String?,
+      thingSpeakChannelId: json['thingSpeakChannelId'] as String?,
+      thingSpeakReadApiKey: json['thingSpeakReadApiKey'] as String?,
       notes: json['notes'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       lastActive: json['lastActive'] == null
@@ -31,6 +33,8 @@ Map<String, dynamic> _$$FarmImplToJson(_$FarmImpl instance) =>
       'name': instance.name,
       'deviceId': instance.deviceId,
       'location': instance.location,
+      'thingSpeakChannelId': instance.thingSpeakChannelId,
+      'thingSpeakReadApiKey': instance.thingSpeakReadApiKey,
       'notes': instance.notes,
       'createdAt': instance.createdAt.toIso8601String(),
       'lastActive': instance.lastActive?.toIso8601String(),
@@ -53,6 +57,8 @@ _$FarmAnalyticsImpl _$$FarmAnalyticsImplFromJson(Map<String, dynamic> json) =>
     _$FarmAnalyticsImpl(
       farmId: json['farmId'] as String,
       farmName: json['farmName'] as String,
+      thingSpeakChannelId: json['thingSpeakChannelId'] as String?,
+      thingSpeakReadApiKey: json['thingSpeakReadApiKey'] as String?,
       avgTemperature: (json['avgTemperature'] as num).toDouble(),
       avgHumidity: (json['avgHumidity'] as num).toDouble(),
       avgCO2: (json['avgCO2'] as num).toDouble(),
@@ -83,6 +89,8 @@ Map<String, dynamic> _$$FarmAnalyticsImplToJson(_$FarmAnalyticsImpl instance) =>
     <String, dynamic>{
       'farmId': instance.farmId,
       'farmName': instance.farmName,
+      'thingSpeakChannelId': instance.thingSpeakChannelId,
+      'thingSpeakReadApiKey': instance.thingSpeakReadApiKey,
       'avgTemperature': instance.avgTemperature,
       'avgHumidity': instance.avgHumidity,
       'avgCO2': instance.avgCO2,

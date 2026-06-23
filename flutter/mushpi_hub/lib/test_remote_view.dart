@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/thingspeak_provider.dart';
+import 'data/models/farm.dart';
 
 class TestRemoteView extends ConsumerWidget {
-  const TestRemoteView({super.key});
+  const TestRemoteView({super.key, required this.farm});
+  final Farm farm;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncData = ref.watch(thingSpeakProvider);
+    final hasThingSpeak = farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
+    final thingSpeakAsync = hasThingSpeak ? ref.watch(thingSpeakProvider((
+      channelId: farm.thingSpeakChannelId!,
+      readApiKey: farm.thingSpeakReadApiKey!,
+    ))) : const AsyncValue<ThingSpeakReading>.loading();
 
     return Scaffold(
       appBar: AppBar(title: const Text('ThingSpeak Test')),
       body: Center(
-        child: asyncData.when(
+        child: thingSpeakAsync.when(
           data: (reading) => Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

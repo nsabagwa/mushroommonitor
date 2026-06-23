@@ -7,6 +7,8 @@ class Farms extends Table {
   TextColumn get deviceId => text().nullable().unique()(); // One device per farm
   TextColumn get location => text().nullable()();
   TextColumn get notes => text().nullable()();
+  TextColumn get thingSpeakChannelId => text().nullable()();
+  TextColumn get thingSpeakReadApiKey => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get lastActive => dateTime().nullable()();
   IntColumn get totalHarvests => integer().withDefault(const Constant(0))();

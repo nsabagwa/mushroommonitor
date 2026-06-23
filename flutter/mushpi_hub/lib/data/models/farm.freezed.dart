@@ -26,6 +26,9 @@ mixin _$Farm {
       throw _privateConstructorUsedError; // Linked MushPi device ID (one-to-one)
   String? get location =>
       throw _privateConstructorUsedError; // Optional location
+//Fields for ThingSpeak Integration
+  String? get thingSpeakChannelId => throw _privateConstructorUsedError;
+  String? get thingSpeakReadApiKey => throw _privateConstructorUsedError;
   String? get notes =>
       throw _privateConstructorUsedError; // Farm notes/description
   DateTime get createdAt =>
@@ -63,6 +66,8 @@ abstract class $FarmCopyWith<$Res> {
       String name,
       String? deviceId,
       String? location,
+      String? thingSpeakChannelId,
+      String? thingSpeakReadApiKey,
       String? notes,
       DateTime createdAt,
       DateTime? lastActive,
@@ -93,6 +98,8 @@ class _$FarmCopyWithImpl<$Res, $Val extends Farm>
     Object? name = null,
     Object? deviceId = freezed,
     Object? location = freezed,
+    Object? thingSpeakChannelId = freezed,
+    Object? thingSpeakReadApiKey = freezed,
     Object? notes = freezed,
     Object? createdAt = null,
     Object? lastActive = freezed,
@@ -119,6 +126,14 @@ class _$FarmCopyWithImpl<$Res, $Val extends Farm>
       location: freezed == location
           ? _value.location
           : location // ignore: cast_nullable_to_non_nullable
+              as String?,
+      thingSpeakChannelId: freezed == thingSpeakChannelId
+          ? _value.thingSpeakChannelId
+          : thingSpeakChannelId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      thingSpeakReadApiKey: freezed == thingSpeakReadApiKey
+          ? _value.thingSpeakReadApiKey
+          : thingSpeakReadApiKey // ignore: cast_nullable_to_non_nullable
               as String?,
       notes: freezed == notes
           ? _value.notes
@@ -172,6 +187,8 @@ abstract class _$$FarmImplCopyWith<$Res> implements $FarmCopyWith<$Res> {
       String name,
       String? deviceId,
       String? location,
+      String? thingSpeakChannelId,
+      String? thingSpeakReadApiKey,
       String? notes,
       DateTime createdAt,
       DateTime? lastActive,
@@ -199,6 +216,8 @@ class __$$FarmImplCopyWithImpl<$Res>
     Object? name = null,
     Object? deviceId = freezed,
     Object? location = freezed,
+    Object? thingSpeakChannelId = freezed,
+    Object? thingSpeakReadApiKey = freezed,
     Object? notes = freezed,
     Object? createdAt = null,
     Object? lastActive = freezed,
@@ -225,6 +244,14 @@ class __$$FarmImplCopyWithImpl<$Res>
       location: freezed == location
           ? _value.location
           : location // ignore: cast_nullable_to_non_nullable
+              as String?,
+      thingSpeakChannelId: freezed == thingSpeakChannelId
+          ? _value.thingSpeakChannelId
+          : thingSpeakChannelId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      thingSpeakReadApiKey: freezed == thingSpeakReadApiKey
+          ? _value.thingSpeakReadApiKey
+          : thingSpeakReadApiKey // ignore: cast_nullable_to_non_nullable
               as String?,
       notes: freezed == notes
           ? _value.notes
@@ -274,6 +301,8 @@ class _$FarmImpl implements _Farm {
       required this.name,
       this.deviceId,
       this.location,
+      this.thingSpeakChannelId,
+      this.thingSpeakReadApiKey,
       this.notes,
       required this.createdAt,
       this.lastActive,
@@ -300,6 +329,11 @@ class _$FarmImpl implements _Farm {
   @override
   final String? location;
 // Optional location
+//Fields for ThingSpeak Integration
+  @override
+  final String? thingSpeakChannelId;
+  @override
+  final String? thingSpeakReadApiKey;
   @override
   final String? notes;
 // Farm notes/description
@@ -340,7 +374,7 @@ class _$FarmImpl implements _Farm {
 
   @override
   String toString() {
-    return 'Farm(id: $id, name: $name, deviceId: $deviceId, location: $location, notes: $notes, createdAt: $createdAt, lastActive: $lastActive, totalHarvests: $totalHarvests, totalYieldKg: $totalYieldKg, primarySpecies: $primarySpecies, imageUrl: $imageUrl, isActive: $isActive, metadata: $metadata)';
+    return 'Farm(id: $id, name: $name, deviceId: $deviceId, location: $location, thingSpeakChannelId: $thingSpeakChannelId, thingSpeakReadApiKey: $thingSpeakReadApiKey, notes: $notes, createdAt: $createdAt, lastActive: $lastActive, totalHarvests: $totalHarvests, totalYieldKg: $totalYieldKg, primarySpecies: $primarySpecies, imageUrl: $imageUrl, isActive: $isActive, metadata: $metadata)';
   }
 
   @override
@@ -354,6 +388,10 @@ class _$FarmImpl implements _Farm {
                 other.deviceId == deviceId) &&
             (identical(other.location, location) ||
                 other.location == location) &&
+            (identical(other.thingSpeakChannelId, thingSpeakChannelId) ||
+                other.thingSpeakChannelId == thingSpeakChannelId) &&
+            (identical(other.thingSpeakReadApiKey, thingSpeakReadApiKey) ||
+                other.thingSpeakReadApiKey == thingSpeakReadApiKey) &&
             (identical(other.notes, notes) || other.notes == notes) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
@@ -380,6 +418,8 @@ class _$FarmImpl implements _Farm {
       name,
       deviceId,
       location,
+      thingSpeakChannelId,
+      thingSpeakReadApiKey,
       notes,
       createdAt,
       lastActive,
@@ -412,6 +452,8 @@ abstract class _Farm implements Farm {
       required final String name,
       final String? deviceId,
       final String? location,
+      final String? thingSpeakChannelId,
+      final String? thingSpeakReadApiKey,
       final String? notes,
       required final DateTime createdAt,
       final DateTime? lastActive,
@@ -432,6 +474,11 @@ abstract class _Farm implements Farm {
   String? get deviceId; // Linked MushPi device ID (one-to-one)
   @override
   String? get location; // Optional location
+//Fields for ThingSpeak Integration
+  @override
+  String? get thingSpeakChannelId;
+  @override
+  String? get thingSpeakReadApiKey;
   @override
   String? get notes; // Farm notes/description
   @override
@@ -467,6 +514,9 @@ FarmAnalytics _$FarmAnalyticsFromJson(Map<String, dynamic> json) {
 mixin _$FarmAnalytics {
   String get farmId => throw _privateConstructorUsedError;
   String get farmName =>
+      throw _privateConstructorUsedError; //Fields for ThingSpeak Integration
+  String? get thingSpeakChannelId => throw _privateConstructorUsedError;
+  String? get thingSpeakReadApiKey =>
       throw _privateConstructorUsedError; // Environmental performance
   double get avgTemperature => throw _privateConstructorUsedError;
   double get avgHumidity => throw _privateConstructorUsedError;
@@ -512,6 +562,8 @@ abstract class $FarmAnalyticsCopyWith<$Res> {
   $Res call(
       {String farmId,
       String farmName,
+      String? thingSpeakChannelId,
+      String? thingSpeakReadApiKey,
       double avgTemperature,
       double avgHumidity,
       double avgCO2,
@@ -551,6 +603,8 @@ class _$FarmAnalyticsCopyWithImpl<$Res, $Val extends FarmAnalytics>
   $Res call({
     Object? farmId = null,
     Object? farmName = null,
+    Object? thingSpeakChannelId = freezed,
+    Object? thingSpeakReadApiKey = freezed,
     Object? avgTemperature = null,
     Object? avgHumidity = null,
     Object? avgCO2 = null,
@@ -581,6 +635,14 @@ class _$FarmAnalyticsCopyWithImpl<$Res, $Val extends FarmAnalytics>
           ? _value.farmName
           : farmName // ignore: cast_nullable_to_non_nullable
               as String,
+      thingSpeakChannelId: freezed == thingSpeakChannelId
+          ? _value.thingSpeakChannelId
+          : thingSpeakChannelId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      thingSpeakReadApiKey: freezed == thingSpeakReadApiKey
+          ? _value.thingSpeakReadApiKey
+          : thingSpeakReadApiKey // ignore: cast_nullable_to_non_nullable
+              as String?,
       avgTemperature: null == avgTemperature
           ? _value.avgTemperature
           : avgTemperature // ignore: cast_nullable_to_non_nullable
@@ -676,6 +738,8 @@ abstract class _$$FarmAnalyticsImplCopyWith<$Res>
   $Res call(
       {String farmId,
       String farmName,
+      String? thingSpeakChannelId,
+      String? thingSpeakReadApiKey,
       double avgTemperature,
       double avgHumidity,
       double avgCO2,
@@ -713,6 +777,8 @@ class __$$FarmAnalyticsImplCopyWithImpl<$Res>
   $Res call({
     Object? farmId = null,
     Object? farmName = null,
+    Object? thingSpeakChannelId = freezed,
+    Object? thingSpeakReadApiKey = freezed,
     Object? avgTemperature = null,
     Object? avgHumidity = null,
     Object? avgCO2 = null,
@@ -743,6 +809,14 @@ class __$$FarmAnalyticsImplCopyWithImpl<$Res>
           ? _value.farmName
           : farmName // ignore: cast_nullable_to_non_nullable
               as String,
+      thingSpeakChannelId: freezed == thingSpeakChannelId
+          ? _value.thingSpeakChannelId
+          : thingSpeakChannelId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      thingSpeakReadApiKey: freezed == thingSpeakReadApiKey
+          ? _value.thingSpeakReadApiKey
+          : thingSpeakReadApiKey // ignore: cast_nullable_to_non_nullable
+              as String?,
       avgTemperature: null == avgTemperature
           ? _value.avgTemperature
           : avgTemperature // ignore: cast_nullable_to_non_nullable
@@ -833,6 +907,8 @@ class _$FarmAnalyticsImpl implements _FarmAnalytics {
   const _$FarmAnalyticsImpl(
       {required this.farmId,
       required this.farmName,
+      this.thingSpeakChannelId,
+      this.thingSpeakReadApiKey,
       required this.avgTemperature,
       required this.avgHumidity,
       required this.avgCO2,
@@ -861,6 +937,11 @@ class _$FarmAnalyticsImpl implements _FarmAnalytics {
   final String farmId;
   @override
   final String farmName;
+//Fields for ThingSpeak Integration
+  @override
+  final String? thingSpeakChannelId;
+  @override
+  final String? thingSpeakReadApiKey;
 // Environmental performance
   @override
   final double avgTemperature;
@@ -909,7 +990,7 @@ class _$FarmAnalyticsImpl implements _FarmAnalytics {
 
   @override
   String toString() {
-    return 'FarmAnalytics(farmId: $farmId, farmName: $farmName, avgTemperature: $avgTemperature, avgHumidity: $avgHumidity, avgCO2: $avgCO2, tempCompliancePercent: $tempCompliancePercent, humidityCompliancePercent: $humidityCompliancePercent, co2CompliancePercent: $co2CompliancePercent, harvestCount: $harvestCount, totalYieldKg: $totalYieldKg, avgYieldPerHarvest: $avgYieldPerHarvest, daysInProduction: $daysInProduction, yieldPerDay: $yieldPerDay, currentStage: $currentStage, daysInCurrentStage: $daysInCurrentStage, stageTransitions: $stageTransitions, totalAlerts: $totalAlerts, criticalAlerts: $criticalAlerts, uptimePercent: $uptimePercent, lastConnection: $lastConnection, periodStart: $periodStart, periodEnd: $periodEnd)';
+    return 'FarmAnalytics(farmId: $farmId, farmName: $farmName, thingSpeakChannelId: $thingSpeakChannelId, thingSpeakReadApiKey: $thingSpeakReadApiKey, avgTemperature: $avgTemperature, avgHumidity: $avgHumidity, avgCO2: $avgCO2, tempCompliancePercent: $tempCompliancePercent, humidityCompliancePercent: $humidityCompliancePercent, co2CompliancePercent: $co2CompliancePercent, harvestCount: $harvestCount, totalYieldKg: $totalYieldKg, avgYieldPerHarvest: $avgYieldPerHarvest, daysInProduction: $daysInProduction, yieldPerDay: $yieldPerDay, currentStage: $currentStage, daysInCurrentStage: $daysInCurrentStage, stageTransitions: $stageTransitions, totalAlerts: $totalAlerts, criticalAlerts: $criticalAlerts, uptimePercent: $uptimePercent, lastConnection: $lastConnection, periodStart: $periodStart, periodEnd: $periodEnd)';
   }
 
   @override
@@ -920,6 +1001,10 @@ class _$FarmAnalyticsImpl implements _FarmAnalytics {
             (identical(other.farmId, farmId) || other.farmId == farmId) &&
             (identical(other.farmName, farmName) ||
                 other.farmName == farmName) &&
+            (identical(other.thingSpeakChannelId, thingSpeakChannelId) ||
+                other.thingSpeakChannelId == thingSpeakChannelId) &&
+            (identical(other.thingSpeakReadApiKey, thingSpeakReadApiKey) ||
+                other.thingSpeakReadApiKey == thingSpeakReadApiKey) &&
             (identical(other.avgTemperature, avgTemperature) ||
                 other.avgTemperature == avgTemperature) &&
             (identical(other.avgHumidity, avgHumidity) ||
@@ -968,6 +1053,8 @@ class _$FarmAnalyticsImpl implements _FarmAnalytics {
         runtimeType,
         farmId,
         farmName,
+        thingSpeakChannelId,
+        thingSpeakReadApiKey,
         avgTemperature,
         avgHumidity,
         avgCO2,
@@ -1010,6 +1097,8 @@ abstract class _FarmAnalytics implements FarmAnalytics {
   const factory _FarmAnalytics(
       {required final String farmId,
       required final String farmName,
+      final String? thingSpeakChannelId,
+      final String? thingSpeakReadApiKey,
       required final double avgTemperature,
       required final double avgHumidity,
       required final double avgCO2,
@@ -1037,7 +1126,11 @@ abstract class _FarmAnalytics implements FarmAnalytics {
   @override
   String get farmId;
   @override
-  String get farmName; // Environmental performance
+  String get farmName; //Fields for ThingSpeak Integration
+  @override
+  String? get thingSpeakChannelId;
+  @override
+  String? get thingSpeakReadApiKey; // Environmental performance
   @override
   double get avgTemperature;
   @override

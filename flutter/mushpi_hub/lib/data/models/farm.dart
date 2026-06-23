@@ -12,6 +12,9 @@ class Farm with _$Farm {
     required String name, // User-defined name
     String? deviceId, // Linked MushPi device ID (one-to-one)
     String? location, // Optional location
+    //Fields for ThingSpeak Integration
+    String? thingSpeakChannelId,
+    String? thingSpeakReadApiKey,
     String? notes, // Farm notes/description
     required DateTime createdAt, // Farm creation date
     DateTime? lastActive, // Last time device connected
@@ -32,6 +35,10 @@ class FarmAnalytics with _$FarmAnalytics {
   const factory FarmAnalytics({
     required String farmId,
     required String farmName,
+
+    //Fields for ThingSpeak Integration
+    String? thingSpeakChannelId,
+    String? thingSpeakReadApiKey,
     
     // Environmental performance
     required double avgTemperature,

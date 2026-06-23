@@ -720,7 +720,11 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final thingSpeakAsync = ref.watch(thingSpeakProvider);
+    final hasThingSpeak = farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
+    final thingSpeakAsync = hasThingSpeak ? ref.watch(thingSpeakProvider((
+      channelId: farm.thingSpeakChannelId!,
+      apiKey: farm.thingSpeakReadApiKey!,
+    ) as ({String channelId, String readApiKey}))) : const AsyncValue<ThingSpeakReading>.loading();
 
     return Card(
       elevation: 2,

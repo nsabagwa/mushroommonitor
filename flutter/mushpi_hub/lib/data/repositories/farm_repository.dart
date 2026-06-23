@@ -555,6 +555,29 @@ class FarmRepository {
     }
   }
 
+  Future<void> updateThingSpeak({
+    required String farmId,
+    String? channelId,
+    String? readApiKey,
+  }) async {
+    try {
+      await _database.farmsDao.updateThingSpeak(
+        farmId,
+        channelId,
+        readApiKey,
+      );
+      developer.log("ThingSpeak updated for farm $farmId: channel=${channelId ?? "none"}', name: 'FarmRepository'");
+    } catch (e, stackTrace) {
+      developer.log(
+        'Failed to update ThingSpeak',
+        name: 'FarmRepository',
+        error: e,
+        stackTrace: stackTrace,
+        level: 1000,
+      );
+      rethrow;
+    }
+  }
   // ========================
   // VALIDATION
   // ========================
@@ -592,6 +615,8 @@ class FarmRepository {
       id: farm.id,
       name: farm.name,
       deviceId: farm.deviceId, // nullable — fine now that model accepts String?
+      thingSpeakChannelId: farm.thingSpeakChannelId,
+      thingSpeakReadApiKey: farm.thingSpeakReadApiKey,
       location: farm.location,
       notes: farm.notes,
       createdAt: farm.createdAt,
