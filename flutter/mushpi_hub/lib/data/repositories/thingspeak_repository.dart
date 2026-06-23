@@ -1,200 +1,145 @@
 import 'dart:convert';
-
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:mushpi_hub/data/config/thingspeak_config.dart';
 import 'package:mushpi_hub/data/database/app_database.dart';
-import 'package:intl/intl.dart';
 
-/// Repository for fetching historical readings from ThingSpeak.
-///
-/// This is used to "fill in the blanks" on charts when the local database
-/// has gaps (e.g., phone was offline) but the Pi successfully pushed data
-/// to ThingSpeak.
 class ThingSpeakRepository {
-  ThingSpeakRepository({ThingSpeakConfig? config})
-      : _config = config ?? ThingSpeakConfig.fromEnv();
+  const ThingSpeakRepository();
 
-  final ThingSpeakConfig _config;
+  static const _baseUrl = 'https://api.thingspeak.com/channels';
 
-  bool get isEnabled => _config.hasRequiredCredentials;
-
-  /// Fetch readings for a time window and map them into `Reading` models.
-  ///
-  /// The `farmId` is attached to each Reading so they can be merged with
-  /// local DB readings for that farm, but the data itself comes entirely
-  /// from ThingSpeak.
   Future<List<Reading>> fetchReadingsForPeriod({
+    required ThingSpeakConfig config,
     required String farmId,
     required DateTime start,
     required DateTime end,
   }) async {
-    if (!isEnabled) {
-      return const [];
-    }
+    if (!config.hasRequiredCredentials) return const [];
 
     try {
-      final uri = Uri.parse(
-        '${_config.baseUrl}/${_config.channelId}/feeds.json',
-      ).replace(
-        queryParameters: {
-          'api_key': _config.readApiKey,
-          // Use ISO8601 in UTC; ThingSpeak supports start/end query params.
-          'start': DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(start.toUtc()),
-          'end': DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(end.toUtc()),
-        },
-      );
+      final uri = Uri.parse('$_baseUrl/${config.channelId}/feeds.json')
+          .replace(queryParameters: {
+        'api_key': config.readApiKey,
+        'start': _fmt(start),
+        'end': _fmt(end),
+      });
 
-      final response = await http.get(uri);
-      if (response.statusCode != 200) {
-        // Non-200 is treated as "no remote data" to avoid breaking UI.
-        return const [];
-      }
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return const [];
 
-      final decoded = json.decode(response.body) as Map<String, dynamic>;
-      final feeds = decoded['feeds'];
-      if (feeds is! List) {
-        return const [];
-      }
-
-      final readings = <Reading>[];
-      for (final feed in feeds) {
-        if (feed is! Map<String, dynamic>) continue;
-
-        final createdAtRaw = feed['created_at'] as String?;
-        if (createdAtRaw == null) continue;
-
-        DateTime timestamp;
-        try {
-          timestamp = DateTime.parse(createdAtRaw).toLocal();
-        } catch (_) {
-          continue;
-        }
-
-        final tempStr = _getField(feed, _config.fieldTemperature);
-        final rhStr = _getField(feed, _config.fieldHumidity);
-        final co2Str = _getField(feed, _config.fieldCo2);
-        final lightStr = _getField(feed, _config.fieldLight);
-
-        if (tempStr == null ||
-            rhStr == null ||
-            co2Str == null ||
-            lightStr == null) {
-          // Require all four values to avoid partial/invalid points.
-          continue;
-        }
-
-        final temp = double.tryParse(tempStr);
-        final rh = double.tryParse(rhStr);
-        final co2 = int.tryParse(co2Str);
-        final light = int.tryParse(lightStr);
-
-        if (temp == null || rh == null || co2 == null || light == null) {
-          continue;
-        }
-
-        readings.add(
-          Reading(
-            id: 0, // In-memory only; not persisted to DB
-            farmId: farmId,
-            timestamp: timestamp,
-            co2Ppm: co2,
-            temperatureC: temp,
-            relativeHumidity: rh,
-            lightRaw: light,
-          ),
-        );
-      }
-
-      return readings;
-    } catch (_) {
-      // On any error (network, parse), fall back to local-only data.
+      return _parseFeeds(body: response.body, farmId: farmId, config: config);
+    } catch (e) {
+      print('[ThingSpeak] fetchReadingsForPeriod failed: $e');
       return const [];
     }
   }
 
-  /// Fetch the latest reading from ThingSpeak.
-  ///
-  /// Returns the most recent feed entry as a Reading, or null if no data available.
-  Future<Reading?> fetchLatestReading({required String farmId}) async {
-    if (!isEnabled) {
+  Future<Reading?> fetchLatestReading({
+    required ThingSpeakConfig config,
+    required String farmId,
+  }) async {
+    if (!config.hasRequiredCredentials) {
+      print(
+          '[ThingSpeak] missing credentials — channelId="${config.channelId}" apiKey="${config.readApiKey}"');
       return null;
     }
 
     try {
-      final uri = Uri.parse(
-        '${_config.baseUrl}/${_config.channelId}/feeds.json',
-      ).replace(
-        queryParameters: {
-          'api_key': _config.readApiKey,
-          'results': '1', // Only fetch the latest entry
-        },
-      );
+      final uri = Uri.parse('$_baseUrl/${config.channelId}/feeds.json')
+          .replace(queryParameters: {
+        'api_key': config.readApiKey,
+        'results': '1',
+      });
 
-      final response = await http.get(uri);
-      if (response.statusCode != 200) {
-        return null;
-      }
+      print('[ThingSpeak] GET $uri');
 
-      final decoded = json.decode(response.body) as Map<String, dynamic>;
-      final feeds = decoded['feeds'];
-      if (feeds is! List || feeds.isEmpty) {
-        return null;
-      }
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
 
-      final feed = feeds.first;
-      if (feed is! Map<String, dynamic>) return null;
+      print('[ThingSpeak] status=${response.statusCode} body=${response.body}');
+
+      if (response.statusCode != 200) return null;
+
+      final readings =
+          _parseFeeds(body: response.body, farmId: farmId, config: config);
+
+      print('[ThingSpeak] parsed ${readings.length} readings');
+
+      return readings.isNotEmpty ? readings.first : null;
+    } catch (e, st) {
+      print('[ThingSpeak] fetchLatestReading failed: $e\n$st');
+      return null;
+    }
+  }
+
+  List<Reading> _parseFeeds({
+    required String body,
+    required String farmId,
+    required ThingSpeakConfig config,
+  }) {
+    final decoded = jsonDecode(body) as Map<String, dynamic>;
+    final feeds = decoded['feeds'];
+    if (feeds is! List) return const [];
+
+    final results = <Reading>[];
+
+    for (final feed in feeds) {
+      if (feed is! Map<String, dynamic>) continue;
 
       final createdAtRaw = feed['created_at'] as String?;
-      if (createdAtRaw == null) return null;
+      if (createdAtRaw == null) continue;
 
       DateTime timestamp;
       try {
         timestamp = DateTime.parse(createdAtRaw).toLocal();
       } catch (_) {
-        return null;
+        continue;
       }
 
-      final tempStr = _getField(feed, _config.fieldTemperature);
-      final rhStr = _getField(feed, _config.fieldHumidity);
-      final co2Str = _getField(feed, _config.fieldCo2);
-      final lightStr = _getField(feed, _config.fieldLight);
+      final temp = _parseDouble(feed[config.fieldTemperature]);
+      final rh = _parseDouble(feed[config.fieldHumidity]);
+      final co2 = _parseIntFromField(feed[config.fieldCo2]);
+      // FIX 1: light is optional — sensor may send 0.0 or be absent entirely.
+      // FIX 2: _parseIntFromField handles decimal strings like "0.00000"
+      //         by truncating the decimal part before parsing.
+      final light = _parseIntFromField(feed[config.fieldLight]);
 
-      if (tempStr == null ||
-          rhStr == null ||
-          co2Str == null ||
-          lightStr == null) {
-        return null;
+      print('[ThingSpeak] temp=$temp rh=$rh co2=$co2 light=$light');
+
+      // FIX 3: only temp and rh are required; co2 and light are optional.
+      if (temp == null || rh == null) {
+        print('[ThingSpeak] skipping — missing required field (temp or rh)');
+        continue;
       }
 
-      final temp = double.tryParse(tempStr);
-      final rh = double.tryParse(rhStr);
-      final co2 = int.tryParse(co2Str);
-      final light = int.tryParse(lightStr);
-
-      if (temp == null || rh == null || co2 == null || light == null) {
-        return null;
-      }
-
-      return Reading(
-        id: 0, // In-memory only; not persisted to DB
+      results.add(Reading(
+        id: 0,
         farmId: farmId,
         timestamp: timestamp,
-        co2Ppm: co2,
+        // FIX 4: co2 and light default to 0 if absent rather than aborting.
+        co2Ppm: co2 ?? 0,
         temperatureC: temp,
         relativeHumidity: rh,
-        lightRaw: light,
-      );
-    } catch (_) {
-      return null;
+        lightRaw: light ?? 0,
+      ));
     }
+
+    return results;
   }
 
-  String? _getField(Map<String, dynamic> feed, String fieldName) {
-    if (fieldName.isEmpty) return null;
-    final value = feed[fieldName];
-    if (value == null) return null;
-    return value.toString();
+  String _fmt(DateTime dt) =>
+      DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(dt.toUtc());
+
+  double? _parseDouble(dynamic v) =>
+      v == null ? null : double.tryParse(v.toString());
+
+  // FIX: ThingSpeak sends integers as decimal strings e.g. "1114" or "0.00000".
+  // int.tryParse("0.00000") returns null, so we parse as double first then
+  // truncate to int. This handles both "1114" and "0.00000" correctly.
+  int? _parseIntFromField(dynamic v) {
+    if (v == null) return null;
+    final d = double.tryParse(v.toString());
+    return d?.truncate();
   }
 }
-
-

@@ -78,18 +78,6 @@ final readingsDaoProvider = Provider((ref) {
   return db.readingsDao;
 });
 
-/// Provider for DevicesDao - provides easy access to device operations
-///
-/// Usage:
-/// ```dart
-/// final devicesDao = ref.watch(devicesDaoProvider);
-/// final devices = await devicesDao.getAllDevices();
-/// ```
-final devicesDaoProvider = Provider((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.devicesDao;
-});
-
 /// Provider for SettingsDao - provides easy access to app settings
 ///
 /// Usage:

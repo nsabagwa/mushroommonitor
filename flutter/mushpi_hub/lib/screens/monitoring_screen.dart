@@ -5,21 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/farms_provider.dart';
 import '../providers/current_farm_provider.dart';
-import '../providers/actuator_state_provider.dart';
-import '../data/models/relay_reason_code.dart';
-import '../providers/ble_provider.dart';
-import '../core/constants/ble_constants.dart';
-import '../core/utils/ble_serializer.dart';
 import '../data/models/farm.dart';
 
-/// Monitoring screen showing real-time environmental data and system status.
-///
-/// Displays:
-/// - Real-time environmental metrics across all farms
-/// - System alerts and notifications
-/// - Compliance indicators
-/// - Quick action buttons
-/// - Environmental trend charts
 class MonitoringScreen extends ConsumerStatefulWidget {
   const MonitoringScreen({super.key});
 
@@ -31,7 +18,6 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
   @override
   void initState() {
     super.initState();
-    // Start auto-refresh when screen is shown
     _startAutoRefresh();
   }
 
@@ -42,7 +28,6 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
   }
 
   void _startAutoRefresh() {
-    // Refresh every 30 seconds
     Future.delayed(const Duration(seconds: 30), () {
       if (mounted) {
         ref.invalidate(selectedMonitoringFarmLatestReadingProvider);
@@ -51,9 +36,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
     });
   }
 
-  void _stopAutoRefresh() {
-    // The mounted check in _startAutoRefresh will prevent further refreshes
-  }
+  void _stopAutoRefresh() {}
 
   @override
   Widget build(BuildContext context) {
@@ -64,92 +47,75 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
       appBar: AppBar(
         title: const Text('Monitoring'),
         actions: [
-          // Connection status indicator - shows selected farm's status
           farmsAsync.when(
             data: (farms) {
               if (selectedFarmId == null || farms.isEmpty) {
                 return const SizedBox.shrink();
               }
-
               final selectedFarm =
                   farms.where((f) => f.id == selectedFarmId).firstOrNull;
-              if (selectedFarm == null) {
-                return const SizedBox.shrink();
-              }
+              if (selectedFarm == null) return const SizedBox.shrink();
 
-              // Single source of truth: farm is online if lastActive < 1 minute
-              final isOnline = selectedFarm.lastActive != null &&
+              final isLive = selectedFarm.lastActive != null &&
                   DateTime.now()
                           .difference(selectedFarm.lastActive!)
                           .inMinutes <
                       1;
 
               return Padding(
-                padding: const EdgeInsets.only(right: 8.0),
+                padding: const EdgeInsets.only(right: 4.0),
                 child: Center(
                   child: InkWell(
-                    onTap: () {
-                      // Show connection help dialog
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Row(
-                            children: [
-                              Icon(
-                                isOnline ? Icons.check_circle : Icons.cancel,
-                                color: isOnline ? Colors.green : Colors.grey,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(isOnline ? 'Farm Online' : 'Farm Offline'),
-                            ],
-                          ),
-                          content: Text(
-                            isOnline
-                                ? '${selectedFarm.name} is online and actively reporting data.'
-                                : '${selectedFarm.name} is offline.\n\nTo reconnect:\n1. Go to Farms tab\n2. Tap the farm card\n3. Tap "Connect" button\n\nNote: Farm shows "Online" if it was active within the last 1 minute.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('OK'),
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: Row(
+                          children: [
+                            Icon(
+                              isLive ? Icons.check_circle : Icons.cloud_off,
+                              color: isLive ? Colors.green : Colors.grey,
                             ),
-                            if (!isOnline)
-                              ElevatedButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                  // Navigate to Farms tab with mounted check
-                                  // to avoid navigation stack errors
-                                  if (context.mounted) {
-                                    context.go('/farms');
-                                  }
-                                },
-                                child: const Text('Go to Farms'),
-                              ),
+                            const SizedBox(width: 8),
+                            Text(isLive ? 'Live Data' : 'Stale Data'),
                           ],
                         ),
-                      );
-                    },
+                        content: Text(
+                          isLive
+                              ? '${selectedFarm.name} is actively sending data to ThingSpeak.'
+                              : '${selectedFarm.name} has not reported recently.\n\n'
+                                  'Check that your MushPi device is powered on and '
+                                  'connected to the internet.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
+                    ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                          horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: isOnline ? Colors.green : Colors.grey,
+                        color: isLive ? Colors.green : Colors.grey,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            isOnline ? Icons.check_circle : Icons.cancel,
-                            size: 16,
+                            isLive ? Icons.cloud_done : Icons.cloud_off,
+                            size: 14,
                             color: Colors.white,
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
                           Text(
-                            isOnline ? 'Online' : 'Offline',
+                            isLive ? 'Live' : 'Stale',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -163,11 +129,13 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
           ),
-          // Refresh button
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.refresh(activeFarmsProvider.future),
             tooltip: 'Refresh',
+            onPressed: () {
+              ref.invalidate(selectedMonitoringFarmLatestReadingProvider);
+              ref.refresh(activeFarmsProvider.future);
+            },
           ),
         ],
       ),
@@ -175,11 +143,10 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
         data: (farms) {
           if (farms.isEmpty) {
             return _EmptyMonitoringView(
-              onAddFarm: () => context.push('/farms/scan'),
+              onAddFarm: () => context.push('/farms/add'),
             );
           }
 
-          // If multiple farms and no farm selected, show farm selector
           if (farms.length > 1 && selectedFarmId == null) {
             return _FarmSelectorView(
               farms: farms,
@@ -190,16 +157,13 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
             );
           }
 
-          // If single farm and no selection, auto-select it
           if (farms.length == 1 && selectedFarmId == null) {
-            // Auto-select the only farm
             WidgetsBinding.instance.addPostFrameCallback((_) {
               ref.read(selectedMonitoringFarmIdProvider.notifier).state =
                   farms.first.id;
             });
           }
 
-          // Find the selected farm
           final selectedFarm = selectedFarmId != null
               ? farms.firstWhere(
                   (f) => f.id == selectedFarmId,
@@ -208,10 +172,12 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
               : farms.first;
 
           return RefreshIndicator(
-            onRefresh: () => ref.refresh(activeFarmsProvider.future),
+            onRefresh: () async {
+              ref.invalidate(selectedMonitoringFarmLatestReadingProvider);
+              await ref.refresh(activeFarmsProvider.future);
+            },
             child: CustomScrollView(
               slivers: [
-                // Farm selector dropdown (if multiple farms)
                 if (farms.length > 1)
                   SliverToBoxAdapter(
                     child: Padding(
@@ -223,20 +189,18 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                           ref
                               .read(selectedMonitoringFarmIdProvider.notifier)
                               .state = farmId;
+                          ref.invalidate(
+                              selectedMonitoringFarmLatestReadingProvider);
                         },
                       ),
                     ),
                   ),
-
-                // System status for selected farm
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     child: _FarmStatusCard(farm: selectedFarm),
                   ),
                 ),
-
-                // Reconnect banner if farm is offline
                 if (selectedFarm.lastActive == null ||
                     DateTime.now()
                             .difference(selectedFarm.lastActive!)
@@ -244,49 +208,36 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                         30)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                       child: Card(
                         color: Colors.orange.shade50,
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.warning_amber,
-                                      color: Colors.orange.shade700),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'Not Connected',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                            color: Colors.orange.shade900,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                              Icon(Icons.cloud_off,
+                                  color: Colors.orange.shade700),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Data may be stale',
+                                      style: TextStyle(
+                                        color: Colors.orange.shade900,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Your MushPi is offline. Showing last known data. Real-time updates paused.',
-                                style: TextStyle(color: Colors.orange.shade900),
-                              ),
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: () => context.push('/farms/scan'),
-                                  icon: const Icon(Icons.refresh),
-                                  label: const Text('Reconnect Device'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.orange.shade700,
-                                    foregroundColor: Colors.white,
-                                  ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Last update was more than 30 minutes ago. '
+                                      'Check your ThingSpeak channel is receiving data.',
+                                      style: TextStyle(
+                                          color: Colors.orange.shade900,
+                                          fontSize: 13),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -295,54 +246,30 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                       ),
                     ),
                   ),
-
-                // Environmental overview for selected farm
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: _EnvironmentalOverviewCard(farm: selectedFarm),
                   ),
                 ),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                // Stage Progress card
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _StageProgressCard(),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: _ThingSpeakInfoCard(farm: selectedFarm),
                   ),
                 ),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                // Actuator state/modes
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _ActuatorStateCard(),
-                  ),
-                ),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                // Farm details
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     child: Text(
                       'Farm Details',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
                 ),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-                // Farm info card
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: _FarmInfoCard(
                       farm: selectedFarm,
                       onViewDetails: () =>
@@ -350,37 +277,25 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                     ),
                   ),
                 ),
-
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 80), // Bottom padding
-                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
               ],
             ),
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Theme.of(context).colorScheme.error,
-              ),
+              Icon(Icons.error_outline,
+                  size: 64, color: Theme.of(context).colorScheme.error),
               const SizedBox(height: 16),
-              Text(
-                'Error loading monitoring data',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+              Text('Error loading monitoring data',
+                  style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-              Text(
-                error.toString(),
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
+              Text(error.toString(),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: () => ref.invalidate(activeFarmsProvider),
@@ -395,13 +310,10 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
   }
 }
 
-/// Farm selector view shown when no farm is selected
-class _FarmSelectorView extends StatelessWidget {
-  const _FarmSelectorView({
-    required this.farms,
-    required this.onSelectFarm,
-  });
+// ── Farm selector (multi-farm) ────────────────────────────────────────────────
 
+class _FarmSelectorView extends StatelessWidget {
+  const _FarmSelectorView({required this.farms, required this.onSelectFarm});
   final List<Farm> farms;
   final ValueChanged<String> onSelectFarm;
 
@@ -413,25 +325,22 @@ class _FarmSelectorView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.monitor_heart_outlined,
-              size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-            ),
+            Icon(Icons.monitor_heart_outlined,
+                size: 80,
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.5)),
             const SizedBox(height: 24),
-            Text(
-              'Select a Farm to Monitor',
-              style: Theme.of(context).textTheme.headlineMedium,
-              textAlign: TextAlign.center,
-            ),
+            Text('Select a Farm to Monitor',
+                style: Theme.of(context).textTheme.headlineMedium,
+                textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            Text(
-              'Choose which farm you want to monitor',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
+            Text('Choose which farm you want to monitor',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                textAlign: TextAlign.center),
             const SizedBox(height: 32),
             ...farms.map((farm) => Padding(
                   padding: const EdgeInsets.only(bottom: 12.0),
@@ -440,8 +349,7 @@ class _FarmSelectorView extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () => onSelectFarm(farm.id),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.all(16),
-                      ),
+                          padding: const EdgeInsets.all(16)),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -449,18 +357,16 @@ class _FarmSelectorView extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  farm.name,
-                                  style:
-                                      Theme.of(context).textTheme.titleMedium,
-                                ),
+                                Text(farm.name,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium),
                                 if (farm.location != null) ...[
                                   const SizedBox(height: 4),
-                                  Text(
-                                    farm.location!,
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
-                                  ),
+                                  Text(farm.location!,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall),
                                 ],
                               ],
                             ),
@@ -478,14 +384,14 @@ class _FarmSelectorView extends StatelessWidget {
   }
 }
 
-/// Farm dropdown selector
+// ── Farm dropdown (multi-farm toolbar) ───────────────────────────────────────
+
 class _FarmDropdownSelector extends StatelessWidget {
   const _FarmDropdownSelector({
     required this.farms,
     required this.selectedFarmId,
     required this.onChanged,
   });
-
   final List<Farm> farms;
   final String? selectedFarmId;
   final ValueChanged<String?> onChanged;
@@ -497,10 +403,8 @@ class _FarmDropdownSelector extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Row(
           children: [
-            Icon(
-              Icons.agriculture,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+            Icon(Icons.agriculture,
+                color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 12),
             Expanded(
               child: DropdownButton<String>(
@@ -508,12 +412,12 @@ class _FarmDropdownSelector extends StatelessWidget {
                 isExpanded: true,
                 underline: const SizedBox(),
                 hint: const Text('Select a farm'),
-                items: farms.map((farm) {
-                  return DropdownMenuItem<String>(
-                    value: farm.id,
-                    child: Text(farm.name),
-                  );
-                }).toList(),
+                items: farms
+                    .map((farm) => DropdownMenuItem<String>(
+                          value: farm.id,
+                          child: Text(farm.name),
+                        ))
+                    .toList(),
                 onChanged: onChanged,
               ),
             ),
@@ -524,62 +428,73 @@ class _FarmDropdownSelector extends StatelessWidget {
   }
 }
 
-/// Farm status card for single farm
+// ── Farm status card (redesigned stats) ──────────────────────────────────────
+
 class _FarmStatusCard extends StatelessWidget {
   const _FarmStatusCard({required this.farm});
-
   final Farm farm;
 
-  bool get isOnline {
+  bool get _isLive {
     if (farm.lastActive == null) return false;
     return DateTime.now().difference(farm.lastActive!).inMinutes < 1;
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final isLive = _isLive;
 
     return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header row
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    'Status',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                Container(
+                Text('Farm Status',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isOnline
-                        ? Colors.green.withOpacity(0.2)
-                        : Colors.grey.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    color: isLive
+                        ? Colors.green.withValues(alpha: 0.15)
+                        : Colors.grey.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isLive ? Colors.green : Colors.grey,
+                      width: 1.5,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Pulsing dot
                       Container(
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: isOnline ? Colors.green : Colors.grey,
+                          color: isLive ? Colors.green : Colors.grey,
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        isOnline ? 'Online' : 'Offline',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isOnline ? Colors.green : Colors.grey,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        isLive ? 'Live' : 'Offline',
+                        style: TextStyle(
+                          color: isLive ? Colors.green : Colors.grey,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
@@ -587,27 +502,42 @@ class _FarmStatusCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
+            // Stats row — redesigned
             Row(
               children: [
                 Expanded(
-                  child: _StatusItem(
-                    icon: Icons.eco,
+                  child: _StatTile(
+                    icon: Icons.eco_rounded,
                     label: 'Total Harvests',
                     value: farm.totalHarvests.toString(),
-                    color: colorScheme.primary,
+                    gradient: LinearGradient(
+                      colors: [
+                        cs.primary.withValues(alpha: 0.15),
+                        cs.primary.withValues(alpha: 0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    iconColor: cs.primary,
+                    valueColor: cs.primary,
                   ),
                 ),
-                Container(
-                  width: 1,
-                  height: 40,
-                  color: colorScheme.outlineVariant,
-                ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: _StatusItem(
-                    icon: Icons.scale,
+                  child: _StatTile(
+                    icon: Icons.scale_rounded,
                     label: 'Total Yield',
                     value: '${farm.totalYieldKg.toStringAsFixed(1)} kg',
-                    color: colorScheme.tertiary,
+                    gradient: LinearGradient(
+                      colors: [
+                        cs.tertiary.withValues(alpha: 0.15),
+                        cs.tertiary.withValues(alpha: 0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    iconColor: cs.tertiary,
+                    valueColor: cs.tertiary,
                   ),
                 ),
               ],
@@ -619,55 +549,473 @@ class _FarmStatusCard extends StatelessWidget {
   }
 }
 
-/// Farm info card with view details button
-class _FarmInfoCard extends StatelessWidget {
-  const _FarmInfoCard({
-    required this.farm,
-    required this.onViewDetails,
+/// Attractive gradient stat tile
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.gradient,
+    required this.iconColor,
+    required this.valueColor,
   });
 
+  final IconData icon;
+  final String label;
+  final String value;
+  final LinearGradient gradient;
+  final Color iconColor;
+  final Color valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: iconColor.withValues(alpha: 0.25),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 22),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: valueColor,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── ThingSpeak channel info ───────────────────────────────────────────────────
+
+class _ThingSpeakInfoCard extends StatelessWidget {
+  const _ThingSpeakInfoCard({required this.farm});
+  final Farm farm;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.cloud, color: cs.primary),
+                const SizedBox(width: 8),
+                Text('ThingSpeak Channel',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        )),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _InfoRow(label: 'Channel ID', value: farm.thingSpeakChannelId),
+            const SizedBox(height: 6),
+            _InfoRow(
+              label: 'Field map',
+              value: farm.thingSpeakFieldMap != null
+                  ? farm.thingSpeakFieldMap!.entries
+                      .map((e) => '${e.key}: ${e.value}')
+                      .join('  •  ')
+                  : 'Default (field1–field4)',
+            ),
+            if (farm.lastActive != null) ...[
+              const SizedBox(height: 6),
+              _InfoRow(label: 'Last fetch', value: _timeAgo(farm.lastActive!)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 90,
+          child: Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant)),
+        ),
+        Expanded(
+          child: Text(value,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Environmental overview (live ThingSpeak data) ─────────────────────────────
+
+class _EnvironmentalOverviewCard extends ConsumerWidget {
+  const _EnvironmentalOverviewCard({required this.farm});
+  final Farm farm;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final readingAsync = ref.watch(selectedMonitoringFarmLatestReadingProvider);
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header: title + badges on separate lines if needed ────────
+            // FIX: wrap the header row to prevent overflow
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Environmental Data',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    // ThingSpeak badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.blue, width: 1.2),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.cloud, size: 14, color: Colors.blue),
+                          const SizedBox(width: 5),
+                          Text(
+                            'ThingSpeak',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Timestamp chip (if data available)
+                    readingAsync.when(
+                      data: (r) => r != null
+                          ? _TimestampChip(timestamp: r.timestamp)
+                          : const SizedBox.shrink(),
+                      loading: () => const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                      error: (_, __) => const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Sensor readings ───────────────────────────────────────────
+            readingAsync.when(
+              data: (reading) {
+                if (reading == null) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        children: [
+                          Icon(Icons.sensors_off,
+                              size: 48,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No sensor data available.\nCheck your ThingSpeak channel.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: [
+                    // Row 1: Temperature + Humidity
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _MetricTile(
+                            icon: Icons.thermostat_rounded,
+                            label: 'Temperature',
+                            value:
+                                '${reading.temperatureC.toStringAsFixed(1)}°C',
+                            color: _tempColor(reading.temperatureC),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _MetricTile(
+                            icon: Icons.water_drop_rounded,
+                            label: 'Humidity',
+                            value:
+                                '${reading.relativeHumidity.toStringAsFixed(0)}%',
+                            color: _rhColor(reading.relativeHumidity),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Row 2: CO₂ + Light
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _MetricTile(
+                            icon: Icons.air_rounded,
+                            label: 'CO₂',
+                            value: '${reading.co2Ppm} ppm',
+                            color: _co2Color(reading.co2Ppm),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _MetricTile(
+                            icon: Icons.light_mode_rounded,
+                            label: 'Light',
+                            value: reading.lightRaw.toString(),
+                            color: Colors.amber.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+              loading: () => const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+              error: (_, __) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Error loading sensor data',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  context.push('/monitoring/charts');
+                  developer.log('Navigating to charts',
+                      name: 'MonitoringScreen');
+                },
+                icon: const Icon(Icons.show_chart),
+                label: const Text('View Charts & Trends'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _tempColor(double t) {
+    if (t < 15) return Colors.blue;
+    if (t > 28) return Colors.red;
+    return Colors.orange;
+  }
+
+  Color _rhColor(double rh) {
+    if (rh < 60) return Colors.orange;
+    if (rh > 95) return Colors.red;
+    return Colors.blue;
+  }
+
+  Color _co2Color(int co2) {
+    if (co2 > 2000) return Colors.red;
+    if (co2 > 1000) return Colors.orange;
+    return Colors.green;
+  }
+}
+
+/// Attractive card-style metric tile (replaces the old inline row widget)
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Farm info card ────────────────────────────────────────────────────────────
+
+class _FarmInfoCard extends StatelessWidget {
+  const _FarmInfoCard({required this.farm, required this.onViewDetails});
   final Farm farm;
   final VoidCallback onViewDetails;
 
   @override
   Widget build(BuildContext context) {
     return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              farm.name,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text(farm.name, style: Theme.of(context).textTheme.titleLarge),
             if (farm.location != null) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(
-                    Icons.location_on,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                  Icon(Icons.location_on,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                   const SizedBox(width: 4),
-                  Text(
-                    farm.location!,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
+                  Text(farm.location!,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          )),
                 ],
               ),
             ],
             if (farm.notes != null && farm.notes!.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(
-                farm.notes!,
-                style: Theme.of(context).textTheme.bodyMedium,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(farm.notes!,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
             ],
             const SizedBox(height: 16),
             SizedBox(
@@ -685,10 +1033,10 @@ class _FarmInfoCard extends StatelessWidget {
   }
 }
 
-/// Empty state when no farms exist
+// ── Empty state ───────────────────────────────────────────────────────────────
+
 class _EmptyMonitoringView extends StatelessWidget {
   const _EmptyMonitoringView({required this.onAddFarm});
-
   final VoidCallback onAddFarm;
 
   @override
@@ -699,17 +1047,16 @@ class _EmptyMonitoringView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.monitor_outlined,
-              size: 120,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-            ),
+            Icon(Icons.monitor_outlined,
+                size: 120,
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.5)),
             const SizedBox(height: 24),
-            Text(
-              'No Active Monitoring',
-              style: Theme.of(context).textTheme.headlineMedium,
-              textAlign: TextAlign.center,
-            ),
+            Text('No Active Monitoring',
+                style: Theme.of(context).textTheme.headlineMedium,
+                textAlign: TextAlign.center),
             const SizedBox(height: 12),
             Text(
               'Add your first farm to start monitoring environmental conditions.',
@@ -724,10 +1071,8 @@ class _EmptyMonitoringView extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('Add Farm'),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
             ),
           ],
@@ -737,979 +1082,41 @@ class _EmptyMonitoringView extends StatelessWidget {
   }
 }
 
-/// Environmental overview card for single farm
-class _EnvironmentalOverviewCard extends ConsumerWidget {
-  const _EnvironmentalOverviewCard({required this.farm});
+// ── Small reusable widgets ────────────────────────────────────────────────────
 
-  final Farm farm;
-
-  bool get _isBleConnected {
-    if (farm.lastActive == null) return false;
-    return DateTime.now().difference(farm.lastActive!).inMinutes < 1;
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the latest reading for the selected farm
-    final readingAsync = ref.watch(selectedMonitoringFarmLatestReadingProvider);
-    final isBleConnected = _isBleConnected;
-
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Environmental Data',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ),
-                // Mode indicator (Local/Online)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isBleConnected
-                        ? Colors.green.withOpacity(0.15)
-                        : Colors.blue.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isBleConnected ? Colors.green : Colors.blue,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isBleConnected ? Icons.bluetooth_connected : Icons.cloud,
-                        size: 16,
-                        color: isBleConnected ? Colors.green : Colors.blue,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isBleConnected ? 'Local' : 'Online',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: isBleConnected ? Colors.green : Colors.blue,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                readingAsync.when(
-                  data: (reading) => reading != null
-                      ? _TimestampChip(timestamp: reading.timestamp)
-                      : const SizedBox.shrink(),
-                  loading: () => const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            readingAsync.when(
-                data: (reading) {
-                  if (reading == null) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text(
-                          'No sensor data available',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  return Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _EnvironmentalMetric(
-                              icon: Icons.thermostat,
-                              label: 'Temperature',
-                              value:
-                                  '${reading.temperatureC.toStringAsFixed(1)}°C',
-                              color: _getTemperatureColor(reading.temperatureC),
-                            ),
-                          ),
-                          Expanded(
-                            child: _EnvironmentalMetric(
-                              icon: Icons.water_drop,
-                              label: 'Humidity',
-                              value:
-                                  '${reading.relativeHumidity.toStringAsFixed(0)}%',
-                              color:
-                                  _getHumidityColor(reading.relativeHumidity),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _EnvironmentalMetric(
-                              icon: Icons.air,
-                              label: 'CO₂',
-                              value: '${reading.co2Ppm} ppm',
-                              color: _getCO2Color(reading.co2Ppm),
-                            ),
-                          ),
-                          Expanded(
-                            child: _EnvironmentalMetric(
-                              icon: Icons.light_mode,
-                              label: 'Light',
-                              value: reading.lightRaw.toString(),
-                              color: Colors.amber,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-                loading: () => const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
-                  ),
-                ),
-                error: (error, stack) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'Error loading sensor data',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                    ),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 16),
-            // Improved chart navigation button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  context.push('/monitoring/charts');
-                  developer.log(
-                    'Navigating to environmental charts',
-                    name: 'mushpi.monitoring_screen',
-                  );
-                },
-                icon: const Icon(Icons.show_chart),
-                label: const Text('View Charts & Trends'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _getTemperatureColor(double temp) {
-    if (temp < 15) return Colors.blue;
-    if (temp > 28) return Colors.red;
-    return Colors.orange;
-  }
-
-  Color _getHumidityColor(double rh) {
-    if (rh < 60) return Colors.orange;
-    if (rh > 95) return Colors.red;
-    return Colors.blue;
-  }
-
-  Color _getCO2Color(int co2) {
-    if (co2 > 2000) return Colors.red;
-    if (co2 > 1000) return Colors.orange;
-    return Colors.green;
-  }
-}
-
-/// Timestamp chip showing when data was last updated
 class _TimestampChip extends StatelessWidget {
   const _TimestampChip({required this.timestamp});
-
   final DateTime timestamp;
 
-  String _getTimeAgo() {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-
-    if (difference.inSeconds < 60) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${difference.inDays}d ago';
-    }
+  String _timeAgo() {
+    final diff = DateTime.now().difference(timestamp);
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
   }
 
   @override
   Widget build(BuildContext context) {
     final isRecent = DateTime.now().difference(timestamp).inMinutes < 5;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: isRecent
-            ? Colors.green.withOpacity(0.2)
-            : Colors.grey.withOpacity(0.2),
+            ? Colors.green.withValues(alpha: 0.15)
+            : Colors.grey.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.schedule,
-            size: 14,
-            color: isRecent ? Colors.green : Colors.grey,
-          ),
+          Icon(Icons.schedule,
+              size: 13, color: isRecent ? Colors.green : Colors.grey),
           const SizedBox(width: 4),
           Text(
-            _getTimeAgo(),
+            _timeAgo(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: isRecent ? Colors.green : Colors.grey,
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Individual status item
-class _StatusItem extends StatelessWidget {
-  const _StatusItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 32),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
-    );
-  }
-}
-
-/// Environmental metric display
-class _EnvironmentalMetric extends StatelessWidget {
-  const _EnvironmentalMetric({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-/// Actuator modes/state card
-class _ActuatorStateCard extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final targetsAsync = ref.watch(controlTargetsFutureProvider);
-    final actuatorStatusAsync = ref.watch(actuatorStatusStreamProvider);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.settings_remote),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Actuators',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Reload',
-                  onPressed: () => ref.refresh(controlTargetsFutureProvider),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            targetsAsync.when(
-              data: (targets) {
-                if (targets == null) {
-                  return _ActuatorUnavailable();
-                }
-
-                final theme = Theme.of(context);
-
-                // Get actuator status or null if not available
-                final actuatorStatus = actuatorStatusAsync.valueOrNull;
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        _ActuatorChip(
-                          icon: Icons.lightbulb,
-                          label: 'Light',
-                          value: targets.lightMode.displayName,
-                          color: Colors.amber,
-                          subtitle: targets.lightMode == LightMode.cycle
-                              ? 'On ${targets.onMinutes}m / Off ${targets.offMinutes}m'
-                              : null,
-                          statusValue: actuatorStatus?.lightOn,
-                          reasonCode: actuatorStatus?.lightReasonCode,
-                        ),
-                        _ActuatorChip(
-                          icon: Icons.air,
-                          label: 'Fan',
-                          value: 'Auto',
-                          color: theme.colorScheme.primary,
-                          statusValue: actuatorStatus?.fanOn,
-                          reasonCode: actuatorStatus?.fanReasonCode,
-                        ),
-                        _ActuatorChip(
-                          icon: Icons.grain,
-                          label: 'Mist',
-                          value: 'Auto',
-                          color: theme.colorScheme.tertiary,
-                          statusValue: actuatorStatus?.mistOn,
-                          reasonCode: actuatorStatus?.mistReasonCode,
-                        ),
-                        _ActuatorChip(
-                          icon: Icons.local_fire_department,
-                          label: 'Heater',
-                          value: 'Auto',
-                          color: Colors.redAccent,
-                          statusValue: actuatorStatus?.heaterOn,
-                          reasonCode: actuatorStatus?.heaterReasonCode,
-                        ),
-                      ],
-                    ),
-                    if (actuatorStatus == null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'Note: Real-time relay states not available (older firmware or not connected).',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-              },
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-              error: (_, __) => const _ActuatorUnavailable(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ActuatorChip extends StatelessWidget {
-  const _ActuatorChip({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    this.subtitle,
-    this.statusValue,
-    this.reasonCode,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-  final String? subtitle;
-  final bool? statusValue; // null = not available, true = ON, false = OFF
-  final int? reasonCode; // Reason code for relay state (0-255)
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    // Determine status display
-    String? statusText;
-    Color? statusColor;
-    String? reasonText;
-    if (statusValue != null) {
-      statusText = statusValue! ? 'ON' : 'OFF';
-      statusColor = statusValue! ? Colors.green : Colors.grey;
-
-      // Decode reason code if available
-      if (reasonCode != null && reasonCode! > 0) {
-        final reason = RelayReasonCode.fromCode(reasonCode!);
-        reasonText = reason.shortDisplay;
-        // Use reason color only for warnings
-        if (reason.isWarning) {
-          statusColor = Color(reason.displayColor);
-        }
-      }
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              if (statusText != null)
-                Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: statusColor!.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: statusColor, width: 1.5),
-                  ),
-                  child: Text(
-                    statusText,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: statusColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ),
-              if (reasonText != null)
-                Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    reasonText,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          fontSize: 10,
-                        ),
-                  ),
-                )
-              else if (statusText == null && subtitle != null)
-                Text(
-                  subtitle!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActuatorUnavailable extends StatelessWidget {
-  const _ActuatorUnavailable();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline, color: cs.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Actuator modes unavailable. Connect to the device and tap reload.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Stage Progress card showing cultivation stage and progression
-class _StageProgressCard extends ConsumerStatefulWidget {
-  const _StageProgressCard();
-
-  @override
-  ConsumerState<_StageProgressCard> createState() => _StageProgressCardState();
-}
-
-class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
-  StageStateData? _stageData;
-  bool _isLoading = false;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStageData();
-  }
-
-  Future<void> _loadStageData() async {
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final bleOps = ref.read(bleOperationsProvider);
-      final data = await bleOps.readStageState();
-
-      if (!mounted) return;
-
-      if (data != null) {
-        developer.log(
-          '🎯 MONITORING DISPLAY: Received mode=${data.mode.name} (id=${data.mode.id}, displayName="${data.mode.displayName}")',
-          name: 'MonitoringScreen._StageProgressCard',
-        );
-      }
-
-      setState(() {
-        _stageData = data;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _errorMessage = 'Failed to load stage data';
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.timeline, color: cs.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Stage Progress',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.refresh, size: 20),
-                  onPressed: _loadStageData,
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildContent(cs),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContent(ColorScheme cs) {
-    if (_isLoading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (_errorMessage != null) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: cs.errorContainer,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.error_outline, color: cs.error),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                _errorMessage!,
-                style: TextStyle(color: cs.onErrorContainer),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_stageData == null) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, color: cs.onSurfaceVariant),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'No stage data available. Configure stages to begin.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Calculate progress
-    final daysElapsed = _stageData!.daysInStage;
-    final expectedDays = _stageData!.expectedDays;
-    final progressPercent = expectedDays > 0
-        ? (daysElapsed / expectedDays * 100).clamp(0, 100)
-        : 0.0;
-    final daysRemaining = (expectedDays - daysElapsed).clamp(0, expectedDays);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Current Stage Info
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${_stageData!.species.displayName} - ${_stageData!.stage.displayName}',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: cs.primary,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _stageData!.mode.displayName,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: progressPercent >= 100
-                    ? cs.tertiaryContainer
-                    : cs.primaryContainer,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                progressPercent >= 100 ? 'COMPLETE' : 'IN PROGRESS',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: progressPercent >= 100
-                          ? cs.onTertiaryContainer
-                          : cs.onPrimaryContainer,
-                    ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        // Progress Bar
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Day $daysElapsed of $expectedDays',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-                Text(
-                  '${progressPercent.toStringAsFixed(0)}%',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: cs.primary,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: progressPercent / 100,
-                minHeight: 12,
-                backgroundColor: cs.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  progressPercent >= 100 ? cs.tertiary : cs.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Additional Info
-        Row(
-          children: [
-            Expanded(
-              child: _StageMetric(
-                icon: Icons.calendar_today,
-                label: 'Started',
-                value: _formatDate(_stageData!.stageStartTime),
-                color: cs.primary,
-              ),
-            ),
-            Expanded(
-              child: _StageMetric(
-                icon: progressPercent >= 100
-                    ? Icons.check_circle
-                    : Icons.access_time,
-                label: progressPercent >= 100 ? 'Complete' : 'Days Remaining',
-                value: progressPercent >= 100
-                    ? 'Ready to advance'
-                    : '$daysRemaining days',
-                color: progressPercent >= 100 ? cs.tertiary : cs.secondary,
-              ),
-            ),
-          ],
-        ),
-
-        // Next stage hint (only if not complete and not in MANUAL mode)
-        if (progressPercent < 100 && _stageData!.mode != ControlMode.manual)
-          Padding(
-            padding: const EdgeInsets.only(top: 16.0),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: cs.secondaryContainer.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: cs.outline.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: cs.onSecondaryContainer,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _stageData!.mode == ControlMode.full
-                          ? 'Will auto-advance to next stage when complete'
-                          : 'Manual advancement required when complete',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cs.onSecondaryContainer,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date);
-
-    if (diff.inDays == 0) {
-      return 'Today';
-    } else if (diff.inDays == 1) {
-      return 'Yesterday';
-    } else if (diff.inDays < 7) {
-      return '${diff.inDays} days ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  }
-}
-
-/// Stage metric display widget
-class _StageMetric extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _StageMetric({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
           ),

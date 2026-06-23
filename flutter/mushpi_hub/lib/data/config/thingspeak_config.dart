@@ -1,13 +1,10 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
-/// ThingSpeak configuration for the Flutter app.
+/// ThingSpeak configuration built from a farm's stored credentials.
 ///
-/// All values are loaded from the runtime `.env` file via flutter_dotenv.
-/// No hard-coded API keys, channel IDs, or field mappings are used.
+/// Each farm has its own channel ID, read API key, and optional field map.
+/// Default field assignments follow ThingSpeak's field1–field4 convention.
 class ThingSpeakConfig {
-  final bool enabled;
-  final String readApiKey;
   final String channelId;
+  final String readApiKey;
   final String baseUrl;
   final String fieldTemperature;
   final String fieldHumidity;
@@ -15,58 +12,34 @@ class ThingSpeakConfig {
   final String fieldLight;
 
   const ThingSpeakConfig({
-    required this.enabled,
-    required this.readApiKey,
     required this.channelId,
-    required this.baseUrl,
-    required this.fieldTemperature,
-    required this.fieldHumidity,
-    required this.fieldCo2,
-    required this.fieldLight,
+    required this.readApiKey,
+    this.baseUrl = 'https://api.thingspeak.com/channels',
+    this.fieldTemperature = 'field1',
+    this.fieldHumidity = 'field2',
+    this.fieldCo2 = 'field3',
+    this.fieldLight = 'field4',
   });
 
-  /// Load configuration from `.env` using flutter_dotenv.
+  /// Build config from a farm's stored ThingSpeak credentials.
   ///
-  /// This intentionally does not provide default API keys or channel IDs;
-  /// if required values are missing, the integration will be considered
-  /// "effectively disabled" at runtime.
-  static ThingSpeakConfig fromEnv() {
-    final env = dotenv.env;
-
-    bool _getBool(String key, bool defaultValue) {
-      final v = env[key];
-      if (v == null) return defaultValue;
-      final lower = v.toLowerCase().trim();
-      return lower == 'true' ||
-          lower == '1' ||
-          lower == 'yes' ||
-          lower == 'on';
-    }
-
-    String _getString(String key, [String defaultValue = '']) {
-      final v = env[key];
-      if (v == null) return defaultValue;
-      return v.trim();
-    }
-
+  /// [fieldMap] is optional — if the farmer didn't customise field numbers
+  /// the defaults (field1–field4) are used.
+  factory ThingSpeakConfig.fromFarm({
+    required String channelId,
+    required String readApiKey,
+    Map<String, String>? fieldMap,
+  }) {
     return ThingSpeakConfig(
-      enabled: _getBool('MUSHPI_THINGSPEAK_ENABLED', false),
-      // Separate read key so backend can use write key; caller may set them equal.
-      readApiKey: _getString('MUSHPI_THINGSPEAK_READ_API_KEY'),
-      channelId: _getString('MUSHPI_THINGSPEAK_CHANNEL_ID'),
-      baseUrl: _getString(
-        'MUSHPI_THINGSPEAK_BASE_URL',
-        'https://api.thingspeak.com/channels',
-      ),
-      fieldTemperature: _getString('MUSHPI_THINGSPEAK_FIELD_TEMPERATURE'),
-      fieldHumidity: _getString('MUSHPI_THINGSPEAK_FIELD_HUMIDITY'),
-      fieldCo2: _getString('MUSHPI_THINGSPEAK_FIELD_CO2'),
-      fieldLight: _getString('MUSHPI_THINGSPEAK_FIELD_LIGHT'),
+      channelId: channelId,
+      readApiKey: readApiKey,
+      fieldTemperature: fieldMap?['temperature'] ?? 'field1',
+      fieldHumidity: fieldMap?['humidity'] ?? 'field2',
+      fieldCo2: fieldMap?['co2'] ?? 'field3',
+      fieldLight: fieldMap?['light'] ?? 'field4',
     );
   }
 
   bool get hasRequiredCredentials =>
-      enabled && readApiKey.isNotEmpty && channelId.isNotEmpty;
+      channelId.isNotEmpty && readApiKey.isNotEmpty;
 }
-
-

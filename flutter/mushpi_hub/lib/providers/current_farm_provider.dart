@@ -1,590 +1,95 @@
-// lib/providers/current_farm_provider.dart
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mushpi_hub/data/models/farm.dart';
 import 'package:mushpi_hub/core/constants/ble_constants.dart';
-import 'package:mushpi_hub/data/repositories/farm_repository.dart';
 import 'package:mushpi_hub/providers/database_provider.dart';
 import 'package:mushpi_hub/providers/farms_provider.dart';
 import 'package:mushpi_hub/data/repositories/thingspeak_repository.dart';
+import 'package:mushpi_hub/data/config/thingspeak_config.dart';
 import 'dart:developer' as developer;
-import 'dart:async';
 
-/// Selected farm ID for monitoring screen
-///
-/// Manages which farm is selected for viewing in the monitoring screen.
-/// This is separate from the detail view selection and is not persisted.
-///
-/// Usage:
-/// ```dart
-/// final farmId = ref.watch(selectedMonitoringFarmIdProvider);
-/// 
-/// // To select a farm for monitoring:
-/// ref.read(selectedMonitoringFarmIdProvider.notifier).state = 'farm-123';
-/// ```
+/// Which farm is selected on the Monitoring screen.
 final selectedMonitoringFarmIdProvider = StateProvider<String?>((ref) => null);
 
-/// Latest reading for selected monitoring farm provider
+/// Latest environmental reading for the selected farm.
 ///
-/// Provides the most recent environmental reading for the farm selected in monitoring screen.
-/// If farm is offline (not BLE connected), attempts to fetch from ThingSpeak.
-///
-/// Usage:
-/// ```dart
-/// final reading = ref.watch(selectedMonitoringFarmLatestReadingProvider);
-/// reading.when(
-///   data: (r) => r != null ? Text('Temp: ${r.temperatureC}°C') : null,
-///   loading: () => CircularProgressIndicator(),
-///   error: (err, stack) => Text('Error: $err'),
-/// );
-/// ```
+/// Always fetches from ThingSpeak using the farm's own channel credentials.
+/// Falls back to the local cached reading if ThingSpeak is unreachable.
 final selectedMonitoringFarmLatestReadingProvider =
     FutureProvider<EnvironmentalReading?>((ref) async {
   final farmId = ref.watch(selectedMonitoringFarmIdProvider);
-  
-  if (farmId == null) {
-    return null;
-  }
+  if (farmId == null) return null;
 
-  final readingsDao = ref.watch(readingsDaoProvider);
   final farm = await ref.watch(farmByIdProvider(farmId).future);
-  final tsRepo = ThingSpeakRepository();
-  
-  // Check if farm is online (BLE connected) - lastActive within 1 minute
-  final isBleConnected = farm?.lastActive != null &&
-      DateTime.now().difference(farm!.lastActive!).inMinutes < 1;
+  if (farm == null) return null;
 
-  // If BLE connected, use local data
-  if (isBleConnected) {
-    try {
-      final reading = await readingsDao.getLatestReadingByFarm(farmId);
-      
-      if (reading == null) {
-        return null;
-      }
+  final config = ThingSpeakConfig.fromFarm(
+    channelId: farm.thingSpeakChannelId,
+    readApiKey: farm.thingSpeakReadApiKey,
+    fieldMap: farm.thingSpeakFieldMap,
+  );
+
+  const tsRepo = ThingSpeakRepository();
+
+  try {
+    final tsReading = await tsRepo.fetchLatestReading(
+      config: config,
+      farmId: farmId,
+    );
+
+    if (tsReading != null) {
+      // Update lastActive so farm card shows "Live"
+      ref.read(farmOperationsProvider).updateLastActive(farmId);
 
       return EnvironmentalReading(
-        co2Ppm: reading.co2Ppm,
-        temperatureC: reading.temperatureC,
-        relativeHumidity: reading.relativeHumidity,
-        lightRaw: reading.lightRaw,
-        timestamp: reading.timestamp,
+        co2Ppm: tsReading.co2Ppm,
+        temperatureC: tsReading.temperatureC,
+        relativeHumidity: tsReading.relativeHumidity,
+        lightRaw: tsReading.lightRaw,
+        timestamp: tsReading.timestamp,
       );
-    } catch (error, stackTrace) {
-      developer.log(
-        'Failed to get latest reading for monitoring',
-        name: 'mushpi.providers.current_farm',
-        error: error,
-        stackTrace: stackTrace,
-        level: 1000,
-      );
-      return null;
     }
-  } else {
-    // If not BLE connected, try ThingSpeak if enabled
-    if (tsRepo.isEnabled) {
-      try {
-        // First try local DB
-        final localReading = await readingsDao.getLatestReadingByFarm(farmId);
-        
-        // Then try ThingSpeak
-        final tsReading = await tsRepo.fetchLatestReading(farmId: farmId);
-        
-        // Prefer ThingSpeak if it's newer, otherwise use local
-        if (tsReading != null) {
-          if (localReading == null ||
-              tsReading.timestamp.isAfter(localReading.timestamp)) {
-            return EnvironmentalReading(
-              co2Ppm: tsReading.co2Ppm,
-              temperatureC: tsReading.temperatureC,
-              relativeHumidity: tsReading.relativeHumidity,
-              lightRaw: tsReading.lightRaw,
-              timestamp: tsReading.timestamp,
-            );
-          }
-        }
-        
-        // Fall back to local if ThingSpeak is older or unavailable
-        if (localReading != null) {
-          return EnvironmentalReading(
-            co2Ppm: localReading.co2Ppm,
-            temperatureC: localReading.temperatureC,
-            relativeHumidity: localReading.relativeHumidity,
-            lightRaw: localReading.lightRaw,
-            timestamp: localReading.timestamp,
-          );
-        }
-        
-        return null;
-      } catch (error, stackTrace) {
-        developer.log(
-          'Failed to get latest reading (ThingSpeak fallback)',
-          name: 'mushpi.providers.current_farm',
-          error: error,
-          stackTrace: stackTrace,
-          level: 1000,
-        );
-        // Try local as fallback
-        try {
-          final reading = await readingsDao.getLatestReadingByFarm(farmId);
-          if (reading != null) {
-            return EnvironmentalReading(
-              co2Ppm: reading.co2Ppm,
-              temperatureC: reading.temperatureC,
-              relativeHumidity: reading.relativeHumidity,
-              lightRaw: reading.lightRaw,
-              timestamp: reading.timestamp,
-            );
-          }
-        } catch (_) {}
-        return null;
-      }
-    } else {
-      // No ThingSpeak, just use local data
-      try {
-        final reading = await readingsDao.getLatestReadingByFarm(farmId);
-        
-        if (reading == null) {
-          return null;
-        }
-
-        return EnvironmentalReading(
-          co2Ppm: reading.co2Ppm,
-          temperatureC: reading.temperatureC,
-          relativeHumidity: reading.relativeHumidity,
-          lightRaw: reading.lightRaw,
-          timestamp: reading.timestamp,
-        );
-      } catch (error, stackTrace) {
-        developer.log(
-          'Failed to get latest reading for monitoring',
-          name: 'mushpi.providers.current_farm',
-          error: error,
-          stackTrace: stackTrace,
-          level: 1000,
-        );
-        return null;
-      }
-    }
+  } catch (e, st) {
+    developer.log('ThingSpeak fetch failed for farm $farmId',
+        error: e, stackTrace: st, name: 'current_farm_provider');
   }
+
+  // Fallback: last cached reading in local DB
+  try {
+    final readingsDao = ref.watch(readingsDaoProvider);
+    final local = await readingsDao.getLatestReadingByFarm(farmId);
+    if (local != null) {
+      return EnvironmentalReading(
+        co2Ppm: local.co2Ppm,
+        temperatureC: local.temperatureC,
+        relativeHumidity: local.relativeHumidity,
+        lightRaw: local.lightRaw,
+        timestamp: local.timestamp,
+      );
+    }
+  } catch (e) {
+    developer.log('Local DB fallback failed',
+        error: e, name: 'current_farm_provider');
+  }
+
+  return null;
 });
 
-/// Current selected farm ID provider
-///
-/// Manages which farm is currently selected/active in the UI.
-/// Persisted to settings database for restoration on app restart.
-///
-/// Usage:
-/// ```dart
-/// final farmId = ref.watch(currentFarmIdProvider);
-/// if (farmId != null) {
-///   // Farm is selected
-/// }
-/// 
-/// // To select a farm:
-/// ref.read(currentFarmIdProvider.notifier).selectFarm('farm-123');
-/// ```
-final currentFarmIdProvider =
-    StateNotifierProvider<CurrentFarmIdNotifier, String?>((ref) {
-  final settingsDao = ref.watch(settingsDaoProvider);
-  return CurrentFarmIdNotifier(settingsDao);
-});
+/// The farm currently selected for detail/operations (separate from monitoring).
+final currentFarmIdProvider = StateProvider<String?>((ref) => null);
 
-/// Notifier for current farm ID state management
-class CurrentFarmIdNotifier extends StateNotifier<String?> {
-  CurrentFarmIdNotifier(this._settingsDao) : super(null) {
-    _init();
-  }
-
-  final dynamic _settingsDao; // SettingsDao
-
-  Future<void> _init() async {
-    try {
-      // Load last selected farm from settings
-      final lastFarmId = await _settingsDao.getLastSelectedFarmId();
-      
-      if (lastFarmId != null) {
-        developer.log(
-          'Restored last selected farm: $lastFarmId',
-          name: 'mushpi.providers.current_farm',
-        );
-        state = lastFarmId;
-      }
-    } catch (error, stackTrace) {
-      developer.log(
-        'Failed to load last selected farm',
-        name: 'mushpi.providers.current_farm',
-        error: error,
-        stackTrace: stackTrace,
-        level: 900,
-      );
-    }
-  }
-
-  /// Select a farm by ID
-  Future<void> selectFarm(String? farmId) async {
-    try {
-      developer.log(
-        'Selecting farm: $farmId',
-        name: 'mushpi.providers.current_farm',
-      );
-
-      state = farmId;
-
-      // Persist to settings
-      if (farmId != null) {
-        await _settingsDao.setLastSelectedFarmId(farmId);
-      }
-    } catch (error, stackTrace) {
-      developer.log(
-        'Failed to select farm',
-        name: 'mushpi.providers.current_farm',
-        error: error,
-        stackTrace: stackTrace,
-        level: 1000,
-      );
-    }
-  }
-
-  /// Clear current farm selection
-  Future<void> clearSelection() async {
-    await selectFarm(null);
-  }
-}
-
-/// Current selected farm provider
-///
-/// Provides the full Farm object for the currently selected farm.
-/// Returns null if no farm is selected or farm not found.
-///
-/// Usage:
-/// ```dart
-/// final farm = ref.watch(currentFarmProvider);
-/// farm.when(
-///   data: (f) => f != null ? Text(f.name) : Text('No farm selected'),
-///   loading: () => CircularProgressIndicator(),
-///   error: (err, stack) => Text('Error: $err'),
-/// );
-/// ```
 final currentFarmProvider = FutureProvider<Farm?>((ref) async {
   final farmId = ref.watch(currentFarmIdProvider);
-  
-  developer.log(
-    '🔍 [currentFarmProvider] Current farm ID: ${farmId ?? "null"}',
-    name: 'mushpi.providers.current_farm',
-  );
-  
-  if (farmId == null) {
-    developer.log(
-      '⚠️ [currentFarmProvider] No farm selected, returning null',
-      name: 'mushpi.providers.current_farm',
-    );
-    return null;
-  }
-
-  try {
-    // Watch the specific farm by ID
-    final farm = await ref.watch(farmByIdProvider(farmId).future);
-    
-    if (farm != null) {
-      developer.log(
-        '✅ [currentFarmProvider] Loaded farm: ${farm.name} (ID: ${farm.id})',
-        name: 'mushpi.providers.current_farm',
-      );
-    } else {
-      developer.log(
-        '⚠️ [currentFarmProvider] Farm not found: $farmId',
-        name: 'mushpi.providers.current_farm',
-        level: 900,
-      );
-    }
-    
-    return farm;
-  } catch (error, stackTrace) {
-    developer.log(
-      '❌ [currentFarmProvider] Error loading farm $farmId',
-      name: 'mushpi.providers.current_farm',
-      error: error,
-      stackTrace: stackTrace,
-      level: 1000,
-    );
-    rethrow;
-  }
+  if (farmId == null) return null;
+  return await ref.watch(farmByIdProvider(farmId).future);
 });
 
-/// Current farm stats provider
-///
-/// Provides statistics for the currently selected farm.
-///
-/// Usage:
-/// ```dart
-/// final stats = ref.watch(currentFarmStatsProvider);
-/// stats.when(
-///   data: (s) => s != null ? Text('Yield/day: ${s.yieldPerDay}') : null,
-///   loading: () => CircularProgressIndicator(),
-///   error: (err, stack) => Text('Error: $err'),
-/// );
-/// ```
-final currentFarmStatsProvider = FutureProvider<FarmStats?>((ref) async {
-  final farmId = ref.watch(currentFarmIdProvider);
-  
-  if (farmId == null) {
-    return null;
-  }
-
-  return await ref.watch(farmStatsProvider(farmId).future);
-});
-
-/// Current farm harvests provider
-///
-/// Provides all harvests for the currently selected farm.
-///
-/// Usage:
-/// ```dart
-/// final harvests = ref.watch(currentFarmHarvestsProvider);
-/// harvests.when(
-///   data: (list) => ListView(children: list.map(...)),
-///   loading: () => CircularProgressIndicator(),
-///   error: (err, stack) => Text('Error: $err'),
-/// );
-/// ```
-final currentFarmHarvestsProvider =
-    FutureProvider<List<HarvestRecord>>((ref) async {
-  final farmId = ref.watch(currentFarmIdProvider);
-  
-  if (farmId == null) {
-    return [];
-  }
-
-  return await ref.watch(harvestsForFarmProvider(farmId).future);
-});
-
-/// Latest reading for current farm provider
-///
-/// Provides the most recent environmental reading for the currently selected farm.
-///
-/// Usage:
-/// ```dart
-/// final reading = ref.watch(currentFarmLatestReadingProvider);
-/// reading.when(
-///   data: (r) => r != null ? Text('Temp: ${r.temperatureC}°C') : null,
-///   loading: () => CircularProgressIndicator(),
-///   error: (err, stack) => Text('Error: $err'),
-/// );
-/// ```
-final currentFarmLatestReadingProvider =
-    FutureProvider<EnvironmentalReading?>((ref) async {
-  final farmId = ref.watch(currentFarmIdProvider);
-  
-  if (farmId == null) {
-    return null;
-  }
-
-  final readingsDao = ref.watch(readingsDaoProvider);
-  
-  try {
-    final reading = await readingsDao.getLatestReadingByFarm(farmId);
-    
-    if (reading == null) {
-      return null;
-    }
-
-    return EnvironmentalReading(
-      co2Ppm: reading.co2Ppm,
-      temperatureC: reading.temperatureC,
-      relativeHumidity: reading.relativeHumidity,
-      lightRaw: reading.lightRaw,
-      timestamp: reading.timestamp,
-    );
-  } catch (error, stackTrace) {
-    developer.log(
-      'Failed to get latest reading',
-      name: 'mushpi.providers.current_farm',
-      error: error,
-      stackTrace: stackTrace,
-      level: 1000,
-    );
-    return null;
-  }
-});
-
-/// Recent readings for current farm provider
-///
-/// Provides the most recent N environmental readings for the currently selected farm.
-///
-/// Usage:
-/// ```dart
-/// final readings = ref.watch(currentFarmRecentReadingsProvider(24));
-/// readings.when(
-///   data: (list) => Chart(data: list),
-///   loading: () => CircularProgressIndicator(),
-///   error: (err, stack) => Text('Error: $err'),
-/// );
-/// ```
-final currentFarmRecentReadingsProvider =
-    FutureProvider.family<List<EnvironmentalReading>, int>((ref, limit) async {
-  final farmId = ref.watch(currentFarmIdProvider);
-  
-  if (farmId == null) {
-    return [];
-  }
-
-  final readingsDao = ref.watch(readingsDaoProvider);
-  
-  try {
-    final readings = await readingsDao.getRecentReadingsByFarm(farmId, limit);
-    
-    return readings.map((r) => EnvironmentalReading(
-      co2Ppm: r.co2Ppm,
-      temperatureC: r.temperatureC,
-      relativeHumidity: r.relativeHumidity,
-      lightRaw: r.lightRaw,
-      timestamp: r.timestamp,
-    )).toList();
-  } catch (error, stackTrace) {
-    developer.log(
-      'Failed to get recent readings',
-      name: 'mushpi.providers.current_farm',
-      error: error,
-      stackTrace: stackTrace,
-      level: 1000,
-    );
-    return [];
-  }
-});
-
-/// Environmental reading model for UI
-class EnvironmentalReading {
-  const EnvironmentalReading({
-    required this.co2Ppm,
-    required this.temperatureC,
-    required this.relativeHumidity,
-    required this.lightRaw,
-    required this.timestamp,
-  });
-
-  final int co2Ppm;
-  final double temperatureC;
-  final double relativeHumidity;
-  final int lightRaw;
-  final DateTime timestamp;
-}
-
-/// Current farm auto-refresh provider
-///
-/// Manages automatic data refresh for the current farm.
-/// Periodically refetches farm data, stats, and readings.
-///
-/// Usage:
-/// ```dart
-/// // Start auto-refresh (e.g., when farm detail screen is shown)
-/// ref.read(currentFarmAutoRefreshProvider.notifier).start();
-/// 
-/// // Stop auto-refresh (e.g., when screen is hidden)
-/// ref.read(currentFarmAutoRefreshProvider.notifier).stop();
-/// ```
-final currentFarmAutoRefreshProvider =
-    StateNotifierProvider<CurrentFarmAutoRefreshNotifier, bool>((ref) {
-  return CurrentFarmAutoRefreshNotifier(ref);
-});
-
-/// Notifier for auto-refresh management
-class CurrentFarmAutoRefreshNotifier extends StateNotifier<bool> {
-  CurrentFarmAutoRefreshNotifier(this._ref) : super(false);
-
-  final Ref _ref;
-  Timer? _timer;
-  static const _refreshInterval = Duration(seconds: 30);
-
-  /// Start auto-refresh
-  void start() {
-    if (state) {
-      developer.log(
-        'Auto-refresh already running',
-        name: 'mushpi.providers.current_farm.refresh',
-      );
-      return;
-    }
-
-    developer.log(
-      'Starting auto-refresh (interval: ${_refreshInterval.inSeconds}s)',
-      name: 'mushpi.providers.current_farm.refresh',
-    );
-
-    state = true;
-    
-    _timer = Timer.periodic(_refreshInterval, (_) {
-      _refresh();
-    });
-  }
-
-  /// Stop auto-refresh
-  void stop() {
-    if (!state) {
-      return;
-    }
-
-    developer.log(
-      'Stopping auto-refresh',
-      name: 'mushpi.providers.current_farm.refresh',
-    );
-
-    state = false;
-    _timer?.cancel();
-    _timer = null;
-  }
-
-  void _refresh() {
-    final farmId = _ref.read(currentFarmIdProvider);
-    
-    if (farmId == null) {
-      developer.log(
-        'No farm selected, stopping auto-refresh',
-        name: 'mushpi.providers.current_farm.refresh',
-      );
-      stop();
-      return;
-    }
-
-    developer.log(
-      'Auto-refreshing farm data: $farmId',
-      name: 'mushpi.providers.current_farm.refresh',
-    );
-
-    // Invalidate providers to trigger refresh
-    _ref.invalidate(currentFarmProvider);
-    _ref.invalidate(currentFarmStatsProvider);
-    _ref.invalidate(currentFarmLatestReadingProvider);
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-}
-
-/// Current farm operations provider
-///
-/// Provides convenient methods for operations on the currently selected farm.
-///
-/// Usage:
-/// ```dart
-/// final ops = ref.read(currentFarmOperationsProvider);
-/// await ops.recordHarvest(yieldKg: 2.5, species: Species.oyster);
-/// ```
-final currentFarmOperationsProvider =
-    Provider<CurrentFarmOperations>((ref) {
-  final farmOps = ref.watch(farmOperationsProvider);
-  final currentFarmId = ref.watch(currentFarmIdProvider);
-  
+final currentFarmOperationsProvider = Provider<CurrentFarmOperations>((ref) {
   return CurrentFarmOperations(
-    farmOperations: farmOps,
-    currentFarmId: currentFarmId,
+    farmOperations: ref.watch(farmOperationsProvider),
+    currentFarmId: ref.watch(currentFarmIdProvider),
   );
 });
 
-/// Operations wrapper for current farm
 class CurrentFarmOperations {
   CurrentFarmOperations({
     required this.farmOperations,
@@ -594,7 +99,6 @@ class CurrentFarmOperations {
   final FarmOperations farmOperations;
   final String? currentFarmId;
 
-  /// Record a harvest for the current farm
   Future<String?> recordHarvest({
     required String id,
     required DateTime harvestDate,
@@ -606,15 +110,7 @@ class CurrentFarmOperations {
     String? notes,
     List<String>? photoUrls,
   }) async {
-    if (currentFarmId == null) {
-      developer.log(
-        'No farm selected, cannot record harvest',
-        name: 'mushpi.providers.current_farm.ops',
-        level: 900,
-      );
-      return null;
-    }
-
+    if (currentFarmId == null) return null;
     return await farmOperations.recordHarvest(
       id: id,
       farmId: currentFarmId!,
@@ -629,7 +125,6 @@ class CurrentFarmOperations {
     );
   }
 
-  /// Update current farm details
   Future<void> updateFarm({
     String? name,
     String? location,
@@ -637,15 +132,7 @@ class CurrentFarmOperations {
     Species? primarySpecies,
     String? imageUrl,
   }) async {
-    if (currentFarmId == null) {
-      developer.log(
-        'No farm selected, cannot update',
-        name: 'mushpi.providers.current_farm.ops',
-        level: 900,
-      );
-      return;
-    }
-
+    if (currentFarmId == null) return;
     await farmOperations.updateFarm(
       id: currentFarmId!,
       name: name,
@@ -656,21 +143,30 @@ class CurrentFarmOperations {
     );
   }
 
-  /// Archive current farm
   Future<void> archiveCurrentFarm() async {
-    if (currentFarmId == null) {
-      return;
-    }
-
+    if (currentFarmId == null) return;
     await farmOperations.archiveFarm(currentFarmId!);
   }
 
-  /// Delete current farm
   Future<void> deleteCurrentFarm() async {
-    if (currentFarmId == null) {
-      return;
-    }
-
+    if (currentFarmId == null) return;
     await farmOperations.deleteFarm(currentFarmId!);
   }
+}
+
+/// Environmental reading value object
+class EnvironmentalReading {
+  final int co2Ppm;
+  final double temperatureC;
+  final double relativeHumidity;
+  final int lightRaw;
+  final DateTime timestamp;
+
+  const EnvironmentalReading({
+    required this.co2Ppm,
+    required this.temperatureC,
+    required this.relativeHumidity,
+    required this.lightRaw,
+    required this.timestamp,
+  });
 }

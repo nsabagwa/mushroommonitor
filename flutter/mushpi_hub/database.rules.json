@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "farms": {
+      "$farmId": {
+        ".read": "auth != null && data.child('ownerUid').val() === auth.uid",
+        ".write": "auth != null && (!data.exists() || data.child('ownerUid').val() === auth.uid) && newData.child('ownerUid').val() === auth.uid"
+      }
+    }
+  }
+}

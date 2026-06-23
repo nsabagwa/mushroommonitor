@@ -4,7 +4,13 @@ import 'package:drift/drift.dart';
 class Farms extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
-  TextColumn get deviceId => text().unique()(); // One device per farm
+
+  // ThingSpeak integration (replaces BLE deviceId)
+  TextColumn get thingSpeakChannelId => text().unique()();
+  TextColumn get thingSpeakReadApiKey => text()();
+  // JSON map of field assignments e.g. {"temperature":"field1","humidity":"field2","co2":"field3","light":"field4"}
+  TextColumn get thingSpeakFieldMap => text().nullable()();
+
   TextColumn get location => text().nullable()();
   TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
@@ -38,19 +44,7 @@ class Harvests extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-/// Devices table - BLE device connections
-class Devices extends Table {
-  TextColumn get deviceId => text()();
-  TextColumn get name => text()();
-  TextColumn get address => text()();
-  TextColumn get farmId => text().nullable().references(Farms, #id)();
-  DateTimeColumn get lastConnected => dateTime()();
-
-  @override
-  Set<Column> get primaryKey => {deviceId};
-}
-
-/// Readings table - Environmental sensor data
+/// Readings table - Environmental sensor data (cached from ThingSpeak)
 class Readings extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get farmId => text().references(Farms, #id)();

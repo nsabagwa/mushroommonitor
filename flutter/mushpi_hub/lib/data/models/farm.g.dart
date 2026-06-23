@@ -9,7 +9,12 @@ part of 'farm.dart';
 _$FarmImpl _$$FarmImplFromJson(Map<String, dynamic> json) => _$FarmImpl(
       id: json['id'] as String,
       name: json['name'] as String,
-      deviceId: json['deviceId'] as String,
+      thingSpeakChannelId: json['thingSpeakChannelId'] as String,
+      thingSpeakReadApiKey: json['thingSpeakReadApiKey'] as String,
+      thingSpeakFieldMap:
+          (json['thingSpeakFieldMap'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, e as String),
+      ),
       location: json['location'] as String?,
       notes: json['notes'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
@@ -29,7 +34,9 @@ Map<String, dynamic> _$$FarmImplToJson(_$FarmImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'name': instance.name,
-      'deviceId': instance.deviceId,
+      'thingSpeakChannelId': instance.thingSpeakChannelId,
+      'thingSpeakReadApiKey': instance.thingSpeakReadApiKey,
+      'thingSpeakFieldMap': instance.thingSpeakFieldMap,
       'location': instance.location,
       'notes': instance.notes,
       'createdAt': instance.createdAt.toIso8601String(),
@@ -171,24 +178,4 @@ Map<String, dynamic> _$$CrossFarmComparisonImplToJson(
       'bottomPerformer': instance.bottomPerformer,
       'speciesBreakdown': instance.speciesBreakdown,
       'stageDistribution': instance.stageDistribution,
-    };
-
-_$DeviceInfoImpl _$$DeviceInfoImplFromJson(Map<String, dynamic> json) =>
-    _$DeviceInfoImpl(
-      deviceId: json['deviceId'] as String,
-      name: json['name'] as String,
-      address: json['address'] as String,
-      farmId: json['farmId'] as String?,
-      lastConnected: json['lastConnected'] == null
-          ? null
-          : DateTime.parse(json['lastConnected'] as String),
-    );
-
-Map<String, dynamic> _$$DeviceInfoImplToJson(_$DeviceInfoImpl instance) =>
-    <String, dynamic>{
-      'deviceId': instance.deviceId,
-      'name': instance.name,
-      'address': instance.address,
-      'farmId': instance.farmId,
-      'lastConnected': instance.lastConnected?.toIso8601String(),
     };

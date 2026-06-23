@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "692396303316",
+    "project_id": "mushpi-hub",
+    "storage_bucket": "mushpi-hub.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:692396303316:android:181eeb5dad7846d4296c41",
+        "android_client_info": {
+          "package_name": "com.example.mushpi_hub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjyA_rOOhHOkj3hC7nRmz-UVyNqwzhS44"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

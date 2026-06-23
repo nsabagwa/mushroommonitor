@@ -7,30 +7,35 @@ import 'tables/tables.dart';
 import 'daos/farms_dao.dart';
 import 'daos/harvests_dao.dart';
 import 'daos/readings_dao.dart';
-import 'daos/devices_dao.dart';
 import 'daos/settings_dao.dart';
 
 part 'app_database.g.dart';
 
-/// Main application database with Drift
-/// 
-/// Manages all local data storage including:
-/// - Farms and farm metadata
-/// - Harvest records and production tracking
-/// - Environmental sensor readings
-/// - BLE device connections
-/// - App settings and configuration
 @DriftDatabase(
-  tables: [Farms, Harvests, Devices, Readings, Settings],
-  daos: [FarmsDao, HarvestsDao, ReadingsDao, DevicesDao, SettingsDao],
+  tables: [Farms, Harvests, Readings, Settings],
+  daos: [FarmsDao, HarvestsDao, ReadingsDao, SettingsDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
-  /// Open database connection
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(farms, farms.thingSpeakChannelId);
+            await m.addColumn(farms, farms.thingSpeakReadApiKey);
+            await m.addColumn(farms, farms.thingSpeakFieldMap);
+          }
+        },
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON');
+        },
+      );
+
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
       final dbFolder = await getApplicationDocumentsDirectory();

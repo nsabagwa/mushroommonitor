@@ -30,7 +30,10 @@ class HistoryScreen extends ConsumerWidget {
               Icon(
                 Icons.history,
                 size: 120,
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.5),
               ),
               const SizedBox(height: 24),
               Text(

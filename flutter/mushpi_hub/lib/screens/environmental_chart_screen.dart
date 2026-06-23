@@ -645,15 +645,19 @@ class _ChartCardState extends State<_ChartCard> {
         verticalInterval: _visibleWindowMs / 6, // Show ~6 vertical grid lines
         getDrawingHorizontalLine: (value) {
           return FlLine(
-            color:
-                Theme.of(context).colorScheme.outlineVariant.withOpacity(0.3),
+            color: Theme.of(context)
+                .colorScheme
+                .outlineVariant
+                .withValues(alpha: 0.3),
             strokeWidth: 1,
           );
         },
         getDrawingVerticalLine: (value) {
           return FlLine(
-            color:
-                Theme.of(context).colorScheme.outlineVariant.withOpacity(0.3),
+            color: Theme.of(context)
+                .colorScheme
+                .outlineVariant
+                .withValues(alpha: 0.3),
             strokeWidth: 1,
             dashArray: [5, 5],
           );
@@ -733,7 +737,7 @@ class _ChartCardState extends State<_ChartCard> {
           ),
           belowBarData: BarAreaData(
             show: true,
-            color: widget.color.withOpacity(0.1),
+            color: widget.color.withValues(alpha: 0.1),
           ),
         ),
       ],
@@ -816,7 +820,8 @@ class _EmptyChartView extends StatelessWidget {
             Icon(
               Icons.show_chart,
               size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(
@@ -856,7 +861,8 @@ class _NoDataView extends StatelessWidget {
             Icon(
               Icons.data_usage,
               size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(

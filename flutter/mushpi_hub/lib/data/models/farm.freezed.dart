@@ -22,26 +22,22 @@ Farm _$FarmFromJson(Map<String, dynamic> json) {
 mixin _$Farm {
   String get id => throw _privateConstructorUsedError; // Unique farm ID (UUID)
   String get name => throw _privateConstructorUsedError; // User-defined name
-  String get deviceId =>
-      throw _privateConstructorUsedError; // Linked MushPi device ID (one-to-one)
-  String? get location =>
-      throw _privateConstructorUsedError; // Optional location
-  String? get notes =>
-      throw _privateConstructorUsedError; // Farm notes/description
-  DateTime get createdAt =>
-      throw _privateConstructorUsedError; // Farm creation date
+  String get thingSpeakChannelId =>
+      throw _privateConstructorUsedError; // ThingSpeak channel ID
+  String get thingSpeakReadApiKey =>
+      throw _privateConstructorUsedError; // ThingSpeak read API key
+  Map<String, String>? get thingSpeakFieldMap =>
+      throw _privateConstructorUsedError; // e.g. {"temperature":"field1","humidity":"field2","co2":"field3","light":"field4"}
+  String? get location => throw _privateConstructorUsedError;
+  String? get notes => throw _privateConstructorUsedError;
+  DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime? get lastActive =>
-      throw _privateConstructorUsedError; // Last time device connected
-  int get totalHarvests =>
-      throw _privateConstructorUsedError; // Total number of harvests
-  double get totalYieldKg =>
-      throw _privateConstructorUsedError; // Total yield in kilograms
-  Species? get primarySpecies =>
-      throw _privateConstructorUsedError; // Primary mushroom species grown
-  String? get imageUrl =>
-      throw _privateConstructorUsedError; // Farm photo (local path)
-  bool get isActive =>
-      throw _privateConstructorUsedError; // Farm status (active/archived)
+      throw _privateConstructorUsedError; // Last successful ThingSpeak fetch
+  int get totalHarvests => throw _privateConstructorUsedError;
+  double get totalYieldKg => throw _privateConstructorUsedError;
+  Species? get primarySpecies => throw _privateConstructorUsedError;
+  String? get imageUrl => throw _privateConstructorUsedError;
+  bool get isActive => throw _privateConstructorUsedError;
   Map<String, dynamic>? get metadata => throw _privateConstructorUsedError;
 
   /// Serializes this Farm to a JSON map.
@@ -61,7 +57,9 @@ abstract class $FarmCopyWith<$Res> {
   $Res call(
       {String id,
       String name,
-      String deviceId,
+      String thingSpeakChannelId,
+      String thingSpeakReadApiKey,
+      Map<String, String>? thingSpeakFieldMap,
       String? location,
       String? notes,
       DateTime createdAt,
@@ -91,7 +89,9 @@ class _$FarmCopyWithImpl<$Res, $Val extends Farm>
   $Res call({
     Object? id = null,
     Object? name = null,
-    Object? deviceId = null,
+    Object? thingSpeakChannelId = null,
+    Object? thingSpeakReadApiKey = null,
+    Object? thingSpeakFieldMap = freezed,
     Object? location = freezed,
     Object? notes = freezed,
     Object? createdAt = null,
@@ -112,10 +112,18 @@ class _$FarmCopyWithImpl<$Res, $Val extends Farm>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
-      deviceId: null == deviceId
-          ? _value.deviceId
-          : deviceId // ignore: cast_nullable_to_non_nullable
+      thingSpeakChannelId: null == thingSpeakChannelId
+          ? _value.thingSpeakChannelId
+          : thingSpeakChannelId // ignore: cast_nullable_to_non_nullable
               as String,
+      thingSpeakReadApiKey: null == thingSpeakReadApiKey
+          ? _value.thingSpeakReadApiKey
+          : thingSpeakReadApiKey // ignore: cast_nullable_to_non_nullable
+              as String,
+      thingSpeakFieldMap: freezed == thingSpeakFieldMap
+          ? _value.thingSpeakFieldMap
+          : thingSpeakFieldMap // ignore: cast_nullable_to_non_nullable
+              as Map<String, String>?,
       location: freezed == location
           ? _value.location
           : location // ignore: cast_nullable_to_non_nullable
@@ -170,7 +178,9 @@ abstract class _$$FarmImplCopyWith<$Res> implements $FarmCopyWith<$Res> {
   $Res call(
       {String id,
       String name,
-      String deviceId,
+      String thingSpeakChannelId,
+      String thingSpeakReadApiKey,
+      Map<String, String>? thingSpeakFieldMap,
       String? location,
       String? notes,
       DateTime createdAt,
@@ -197,7 +207,9 @@ class __$$FarmImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? name = null,
-    Object? deviceId = null,
+    Object? thingSpeakChannelId = null,
+    Object? thingSpeakReadApiKey = null,
+    Object? thingSpeakFieldMap = freezed,
     Object? location = freezed,
     Object? notes = freezed,
     Object? createdAt = null,
@@ -218,10 +230,18 @@ class __$$FarmImplCopyWithImpl<$Res>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
-      deviceId: null == deviceId
-          ? _value.deviceId
-          : deviceId // ignore: cast_nullable_to_non_nullable
+      thingSpeakChannelId: null == thingSpeakChannelId
+          ? _value.thingSpeakChannelId
+          : thingSpeakChannelId // ignore: cast_nullable_to_non_nullable
               as String,
+      thingSpeakReadApiKey: null == thingSpeakReadApiKey
+          ? _value.thingSpeakReadApiKey
+          : thingSpeakReadApiKey // ignore: cast_nullable_to_non_nullable
+              as String,
+      thingSpeakFieldMap: freezed == thingSpeakFieldMap
+          ? _value._thingSpeakFieldMap
+          : thingSpeakFieldMap // ignore: cast_nullable_to_non_nullable
+              as Map<String, String>?,
       location: freezed == location
           ? _value.location
           : location // ignore: cast_nullable_to_non_nullable
@@ -272,7 +292,9 @@ class _$FarmImpl implements _Farm {
   const _$FarmImpl(
       {required this.id,
       required this.name,
-      required this.deviceId,
+      required this.thingSpeakChannelId,
+      required this.thingSpeakReadApiKey,
+      final Map<String, String>? thingSpeakFieldMap,
       this.location,
       this.notes,
       required this.createdAt,
@@ -283,7 +305,8 @@ class _$FarmImpl implements _Farm {
       this.imageUrl,
       this.isActive = true,
       final Map<String, dynamic>? metadata})
-      : _metadata = metadata;
+      : _thingSpeakFieldMap = thingSpeakFieldMap,
+        _metadata = metadata;
 
   factory _$FarmImpl.fromJson(Map<String, dynamic> json) =>
       _$$FarmImplFromJson(json);
@@ -295,40 +318,47 @@ class _$FarmImpl implements _Farm {
   final String name;
 // User-defined name
   @override
-  final String deviceId;
-// Linked MushPi device ID (one-to-one)
+  final String thingSpeakChannelId;
+// ThingSpeak channel ID
+  @override
+  final String thingSpeakReadApiKey;
+// ThingSpeak read API key
+  final Map<String, String>? _thingSpeakFieldMap;
+// ThingSpeak read API key
+  @override
+  Map<String, String>? get thingSpeakFieldMap {
+    final value = _thingSpeakFieldMap;
+    if (value == null) return null;
+    if (_thingSpeakFieldMap is EqualUnmodifiableMapView)
+      return _thingSpeakFieldMap;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(value);
+  }
+
+// e.g. {"temperature":"field1","humidity":"field2","co2":"field3","light":"field4"}
   @override
   final String? location;
-// Optional location
   @override
   final String? notes;
-// Farm notes/description
   @override
   final DateTime createdAt;
-// Farm creation date
   @override
   final DateTime? lastActive;
-// Last time device connected
+// Last successful ThingSpeak fetch
   @override
   @JsonKey()
   final int totalHarvests;
-// Total number of harvests
   @override
   @JsonKey()
   final double totalYieldKg;
-// Total yield in kilograms
   @override
   final Species? primarySpecies;
-// Primary mushroom species grown
   @override
   final String? imageUrl;
-// Farm photo (local path)
   @override
   @JsonKey()
   final bool isActive;
-// Farm status (active/archived)
   final Map<String, dynamic>? _metadata;
-// Farm status (active/archived)
   @override
   Map<String, dynamic>? get metadata {
     final value = _metadata;
@@ -340,7 +370,7 @@ class _$FarmImpl implements _Farm {
 
   @override
   String toString() {
-    return 'Farm(id: $id, name: $name, deviceId: $deviceId, location: $location, notes: $notes, createdAt: $createdAt, lastActive: $lastActive, totalHarvests: $totalHarvests, totalYieldKg: $totalYieldKg, primarySpecies: $primarySpecies, imageUrl: $imageUrl, isActive: $isActive, metadata: $metadata)';
+    return 'Farm(id: $id, name: $name, thingSpeakChannelId: $thingSpeakChannelId, thingSpeakReadApiKey: $thingSpeakReadApiKey, thingSpeakFieldMap: $thingSpeakFieldMap, location: $location, notes: $notes, createdAt: $createdAt, lastActive: $lastActive, totalHarvests: $totalHarvests, totalYieldKg: $totalYieldKg, primarySpecies: $primarySpecies, imageUrl: $imageUrl, isActive: $isActive, metadata: $metadata)';
   }
 
   @override
@@ -350,8 +380,12 @@ class _$FarmImpl implements _Farm {
             other is _$FarmImpl &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.name, name) || other.name == name) &&
-            (identical(other.deviceId, deviceId) ||
-                other.deviceId == deviceId) &&
+            (identical(other.thingSpeakChannelId, thingSpeakChannelId) ||
+                other.thingSpeakChannelId == thingSpeakChannelId) &&
+            (identical(other.thingSpeakReadApiKey, thingSpeakReadApiKey) ||
+                other.thingSpeakReadApiKey == thingSpeakReadApiKey) &&
+            const DeepCollectionEquality()
+                .equals(other._thingSpeakFieldMap, _thingSpeakFieldMap) &&
             (identical(other.location, location) ||
                 other.location == location) &&
             (identical(other.notes, notes) || other.notes == notes) &&
@@ -378,7 +412,9 @@ class _$FarmImpl implements _Farm {
       runtimeType,
       id,
       name,
-      deviceId,
+      thingSpeakChannelId,
+      thingSpeakReadApiKey,
+      const DeepCollectionEquality().hash(_thingSpeakFieldMap),
       location,
       notes,
       createdAt,
@@ -410,7 +446,9 @@ abstract class _Farm implements Farm {
   const factory _Farm(
       {required final String id,
       required final String name,
-      required final String deviceId,
+      required final String thingSpeakChannelId,
+      required final String thingSpeakReadApiKey,
+      final Map<String, String>? thingSpeakFieldMap,
       final String? location,
       final String? notes,
       required final DateTime createdAt,
@@ -429,25 +467,30 @@ abstract class _Farm implements Farm {
   @override
   String get name; // User-defined name
   @override
-  String get deviceId; // Linked MushPi device ID (one-to-one)
+  String get thingSpeakChannelId; // ThingSpeak channel ID
   @override
-  String? get location; // Optional location
+  String get thingSpeakReadApiKey; // ThingSpeak read API key
   @override
-  String? get notes; // Farm notes/description
+  Map<String, String>?
+      get thingSpeakFieldMap; // e.g. {"temperature":"field1","humidity":"field2","co2":"field3","light":"field4"}
   @override
-  DateTime get createdAt; // Farm creation date
+  String? get location;
   @override
-  DateTime? get lastActive; // Last time device connected
+  String? get notes;
   @override
-  int get totalHarvests; // Total number of harvests
+  DateTime get createdAt;
   @override
-  double get totalYieldKg; // Total yield in kilograms
+  DateTime? get lastActive; // Last successful ThingSpeak fetch
   @override
-  Species? get primarySpecies; // Primary mushroom species grown
+  int get totalHarvests;
   @override
-  String? get imageUrl; // Farm photo (local path)
+  double get totalYieldKg;
   @override
-  bool get isActive; // Farm status (active/archived)
+  Species? get primarySpecies;
+  @override
+  String? get imageUrl;
+  @override
+  bool get isActive;
   @override
   Map<String, dynamic>? get metadata;
 
@@ -466,30 +509,25 @@ FarmAnalytics _$FarmAnalyticsFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$FarmAnalytics {
   String get farmId => throw _privateConstructorUsedError;
-  String get farmName =>
-      throw _privateConstructorUsedError; // Environmental performance
+  String get farmName => throw _privateConstructorUsedError;
   double get avgTemperature => throw _privateConstructorUsedError;
   double get avgHumidity => throw _privateConstructorUsedError;
   double get avgCO2 => throw _privateConstructorUsedError;
   double get tempCompliancePercent => throw _privateConstructorUsedError;
   double get humidityCompliancePercent => throw _privateConstructorUsedError;
-  double get co2CompliancePercent =>
-      throw _privateConstructorUsedError; // Production metrics
+  double get co2CompliancePercent => throw _privateConstructorUsedError;
   int get harvestCount => throw _privateConstructorUsedError;
   double get totalYieldKg => throw _privateConstructorUsedError;
   double get avgYieldPerHarvest => throw _privateConstructorUsedError;
   int get daysInProduction => throw _privateConstructorUsedError;
-  double get yieldPerDay =>
-      throw _privateConstructorUsedError; // Stage tracking
+  double get yieldPerDay => throw _privateConstructorUsedError;
   GrowthStage? get currentStage => throw _privateConstructorUsedError;
   int get daysInCurrentStage => throw _privateConstructorUsedError;
-  int get stageTransitions =>
-      throw _privateConstructorUsedError; // System health
+  int get stageTransitions => throw _privateConstructorUsedError;
   int get totalAlerts => throw _privateConstructorUsedError;
   int get criticalAlerts => throw _privateConstructorUsedError;
   double get uptimePercent => throw _privateConstructorUsedError;
-  DateTime? get lastConnection =>
-      throw _privateConstructorUsedError; // Time period
+  DateTime? get lastConnection => throw _privateConstructorUsedError;
   DateTime get periodStart => throw _privateConstructorUsedError;
   DateTime get periodEnd => throw _privateConstructorUsedError;
 
@@ -861,7 +899,6 @@ class _$FarmAnalyticsImpl implements _FarmAnalytics {
   final String farmId;
   @override
   final String farmName;
-// Environmental performance
   @override
   final double avgTemperature;
   @override
@@ -874,7 +911,6 @@ class _$FarmAnalyticsImpl implements _FarmAnalytics {
   final double humidityCompliancePercent;
   @override
   final double co2CompliancePercent;
-// Production metrics
   @override
   final int harvestCount;
   @override
@@ -885,14 +921,12 @@ class _$FarmAnalyticsImpl implements _FarmAnalytics {
   final int daysInProduction;
   @override
   final double yieldPerDay;
-// Stage tracking
   @override
   final GrowthStage? currentStage;
   @override
   final int daysInCurrentStage;
   @override
   final int stageTransitions;
-// System health
   @override
   final int totalAlerts;
   @override
@@ -901,7 +935,6 @@ class _$FarmAnalyticsImpl implements _FarmAnalytics {
   final double uptimePercent;
   @override
   final DateTime? lastConnection;
-// Time period
   @override
   final DateTime periodStart;
   @override
@@ -1037,7 +1070,7 @@ abstract class _FarmAnalytics implements FarmAnalytics {
   @override
   String get farmId;
   @override
-  String get farmName; // Environmental performance
+  String get farmName;
   @override
   double get avgTemperature;
   @override
@@ -1049,7 +1082,7 @@ abstract class _FarmAnalytics implements FarmAnalytics {
   @override
   double get humidityCompliancePercent;
   @override
-  double get co2CompliancePercent; // Production metrics
+  double get co2CompliancePercent;
   @override
   int get harvestCount;
   @override
@@ -1059,13 +1092,13 @@ abstract class _FarmAnalytics implements FarmAnalytics {
   @override
   int get daysInProduction;
   @override
-  double get yieldPerDay; // Stage tracking
+  double get yieldPerDay;
   @override
   GrowthStage? get currentStage;
   @override
   int get daysInCurrentStage;
   @override
-  int get stageTransitions; // System health
+  int get stageTransitions;
   @override
   int get totalAlerts;
   @override
@@ -1073,7 +1106,7 @@ abstract class _FarmAnalytics implements FarmAnalytics {
   @override
   double get uptimePercent;
   @override
-  DateTime? get lastConnection; // Time period
+  DateTime? get lastConnection;
   @override
   DateTime get periodStart;
   @override
@@ -1099,13 +1132,10 @@ mixin _$HarvestRecord {
   Species get species => throw _privateConstructorUsedError;
   GrowthStage get stage => throw _privateConstructorUsedError;
   double get yieldKg => throw _privateConstructorUsedError;
-  int? get flushNumber =>
-      throw _privateConstructorUsedError; // Which flush (1st, 2nd, etc.)
-  double? get qualityScore =>
-      throw _privateConstructorUsedError; // 0-10 quality rating
+  int? get flushNumber => throw _privateConstructorUsedError;
+  double? get qualityScore => throw _privateConstructorUsedError;
   String? get notes => throw _privateConstructorUsedError;
-  List<String>? get photoUrls =>
-      throw _privateConstructorUsedError; // Harvest photos
+  List<String>? get photoUrls => throw _privateConstructorUsedError;
   Map<String, dynamic>? get metadata => throw _privateConstructorUsedError;
 
   /// Serializes this HarvestRecord to a JSON map.
@@ -1345,10 +1375,8 @@ class _$HarvestRecordImpl implements _HarvestRecord {
   final double yieldKg;
   @override
   final int? flushNumber;
-// Which flush (1st, 2nd, etc.)
   @override
   final double? qualityScore;
-// 0-10 quality rating
   @override
   final String? notes;
   final List<String>? _photoUrls;
@@ -1361,9 +1389,7 @@ class _$HarvestRecordImpl implements _HarvestRecord {
     return EqualUnmodifiableListView(value);
   }
 
-// Harvest photos
   final Map<String, dynamic>? _metadata;
-// Harvest photos
   @override
   Map<String, dynamic>? get metadata {
     final value = _metadata;
@@ -1462,13 +1488,13 @@ abstract class _HarvestRecord implements HarvestRecord {
   @override
   double get yieldKg;
   @override
-  int? get flushNumber; // Which flush (1st, 2nd, etc.)
+  int? get flushNumber;
   @override
-  double? get qualityScore; // 0-10 quality rating
+  double? get qualityScore;
   @override
   String? get notes;
   @override
-  List<String>? get photoUrls; // Harvest photos
+  List<String>? get photoUrls;
   @override
   Map<String, dynamic>? get metadata;
 
@@ -1807,241 +1833,5 @@ abstract class _CrossFarmComparison implements CrossFarmComparison {
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$CrossFarmComparisonImplCopyWith<_$CrossFarmComparisonImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-DeviceInfo _$DeviceInfoFromJson(Map<String, dynamic> json) {
-  return _DeviceInfo.fromJson(json);
-}
-
-/// @nodoc
-mixin _$DeviceInfo {
-  String get deviceId => throw _privateConstructorUsedError;
-  String get name => throw _privateConstructorUsedError;
-  String get address => throw _privateConstructorUsedError;
-  String? get farmId => throw _privateConstructorUsedError;
-  DateTime? get lastConnected => throw _privateConstructorUsedError;
-
-  /// Serializes this DeviceInfo to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of DeviceInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $DeviceInfoCopyWith<DeviceInfo> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $DeviceInfoCopyWith<$Res> {
-  factory $DeviceInfoCopyWith(
-          DeviceInfo value, $Res Function(DeviceInfo) then) =
-      _$DeviceInfoCopyWithImpl<$Res, DeviceInfo>;
-  @useResult
-  $Res call(
-      {String deviceId,
-      String name,
-      String address,
-      String? farmId,
-      DateTime? lastConnected});
-}
-
-/// @nodoc
-class _$DeviceInfoCopyWithImpl<$Res, $Val extends DeviceInfo>
-    implements $DeviceInfoCopyWith<$Res> {
-  _$DeviceInfoCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of DeviceInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? deviceId = null,
-    Object? name = null,
-    Object? address = null,
-    Object? farmId = freezed,
-    Object? lastConnected = freezed,
-  }) {
-    return _then(_value.copyWith(
-      deviceId: null == deviceId
-          ? _value.deviceId
-          : deviceId // ignore: cast_nullable_to_non_nullable
-              as String,
-      name: null == name
-          ? _value.name
-          : name // ignore: cast_nullable_to_non_nullable
-              as String,
-      address: null == address
-          ? _value.address
-          : address // ignore: cast_nullable_to_non_nullable
-              as String,
-      farmId: freezed == farmId
-          ? _value.farmId
-          : farmId // ignore: cast_nullable_to_non_nullable
-              as String?,
-      lastConnected: freezed == lastConnected
-          ? _value.lastConnected
-          : lastConnected // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-    ) as $Val);
-  }
-}
-
-/// @nodoc
-abstract class _$$DeviceInfoImplCopyWith<$Res>
-    implements $DeviceInfoCopyWith<$Res> {
-  factory _$$DeviceInfoImplCopyWith(
-          _$DeviceInfoImpl value, $Res Function(_$DeviceInfoImpl) then) =
-      __$$DeviceInfoImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call(
-      {String deviceId,
-      String name,
-      String address,
-      String? farmId,
-      DateTime? lastConnected});
-}
-
-/// @nodoc
-class __$$DeviceInfoImplCopyWithImpl<$Res>
-    extends _$DeviceInfoCopyWithImpl<$Res, _$DeviceInfoImpl>
-    implements _$$DeviceInfoImplCopyWith<$Res> {
-  __$$DeviceInfoImplCopyWithImpl(
-      _$DeviceInfoImpl _value, $Res Function(_$DeviceInfoImpl) _then)
-      : super(_value, _then);
-
-  /// Create a copy of DeviceInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? deviceId = null,
-    Object? name = null,
-    Object? address = null,
-    Object? farmId = freezed,
-    Object? lastConnected = freezed,
-  }) {
-    return _then(_$DeviceInfoImpl(
-      deviceId: null == deviceId
-          ? _value.deviceId
-          : deviceId // ignore: cast_nullable_to_non_nullable
-              as String,
-      name: null == name
-          ? _value.name
-          : name // ignore: cast_nullable_to_non_nullable
-              as String,
-      address: null == address
-          ? _value.address
-          : address // ignore: cast_nullable_to_non_nullable
-              as String,
-      farmId: freezed == farmId
-          ? _value.farmId
-          : farmId // ignore: cast_nullable_to_non_nullable
-              as String?,
-      lastConnected: freezed == lastConnected
-          ? _value.lastConnected
-          : lastConnected // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-    ));
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$DeviceInfoImpl implements _DeviceInfo {
-  const _$DeviceInfoImpl(
-      {required this.deviceId,
-      required this.name,
-      required this.address,
-      this.farmId,
-      this.lastConnected});
-
-  factory _$DeviceInfoImpl.fromJson(Map<String, dynamic> json) =>
-      _$$DeviceInfoImplFromJson(json);
-
-  @override
-  final String deviceId;
-  @override
-  final String name;
-  @override
-  final String address;
-  @override
-  final String? farmId;
-  @override
-  final DateTime? lastConnected;
-
-  @override
-  String toString() {
-    return 'DeviceInfo(deviceId: $deviceId, name: $name, address: $address, farmId: $farmId, lastConnected: $lastConnected)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$DeviceInfoImpl &&
-            (identical(other.deviceId, deviceId) ||
-                other.deviceId == deviceId) &&
-            (identical(other.name, name) || other.name == name) &&
-            (identical(other.address, address) || other.address == address) &&
-            (identical(other.farmId, farmId) || other.farmId == farmId) &&
-            (identical(other.lastConnected, lastConnected) ||
-                other.lastConnected == lastConnected));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode =>
-      Object.hash(runtimeType, deviceId, name, address, farmId, lastConnected);
-
-  /// Create a copy of DeviceInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$DeviceInfoImplCopyWith<_$DeviceInfoImpl> get copyWith =>
-      __$$DeviceInfoImplCopyWithImpl<_$DeviceInfoImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$DeviceInfoImplToJson(
-      this,
-    );
-  }
-}
-
-abstract class _DeviceInfo implements DeviceInfo {
-  const factory _DeviceInfo(
-      {required final String deviceId,
-      required final String name,
-      required final String address,
-      final String? farmId,
-      final DateTime? lastConnected}) = _$DeviceInfoImpl;
-
-  factory _DeviceInfo.fromJson(Map<String, dynamic> json) =
-      _$DeviceInfoImpl.fromJson;
-
-  @override
-  String get deviceId;
-  @override
-  String get name;
-  @override
-  String get address;
-  @override
-  String? get farmId;
-  @override
-  DateTime? get lastConnected;
-
-  /// Create a copy of DeviceInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$DeviceInfoImplCopyWith<_$DeviceInfoImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

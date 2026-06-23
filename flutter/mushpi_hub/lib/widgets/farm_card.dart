@@ -5,15 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../data/models/farm.dart';
 import '../core/theme/app_theme.dart';
 
-/// Card widget displaying farm summary information.
-///
-/// Shows:
-/// - Farm name and species
-/// - Current stage and days
-/// - Connection status (real-time BLE)
-/// - Production stats
-/// - Quick metrics
-/// - Reconnect button (if showReconnect=true)
 class FarmCard extends ConsumerWidget {
   const FarmCard({
     required this.farm,
@@ -26,14 +17,13 @@ class FarmCard extends ConsumerWidget {
   final VoidCallback onTap;
   final bool showReconnect;
 
-    @override
+  @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final customColors = Theme.of(context).extension<AppCustomColors>()!;
-    
-    // Single source of truth: farm is online if lastActive < 1 minute
-    final isOnline = farm.lastActive != null && 
-                     DateTime.now().difference(farm.lastActive!).inMinutes < 1;
+
+    final isOnline = farm.lastActive != null &&
+        DateTime.now().difference(farm.lastActive!).inMinutes < 1;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -44,10 +34,8 @@ class FarmCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header row
               Row(
                 children: [
-                  // Farm icon
                   Container(
                     width: 48,
                     height: 48,
@@ -61,10 +49,7 @@ class FarmCard extends ConsumerWidget {
                       size: 28,
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
-                  // Farm name and species
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,27 +72,17 @@ class FarmCard extends ConsumerWidget {
                       ],
                     ),
                   ),
-
-                  // Connection status indicator
-                  _ConnectionIndicator(
-                    isConnected: isOnline,
-                  ),
+                  _ConnectionIndicator(isConnected: isOnline),
                 ],
               ),
-
               const SizedBox(height: 16),
-
-              // Reconnect button if disconnected and showReconnect is true
               if (showReconnect && !isOnline)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12.0),
                   child: SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: () {
-                        // Navigate to farm detail or scan screen for reconnection
-                        context.push('/farms/scan');
-                      },
+                      onPressed: () => context.push('/farms/add'),
                       icon: const Icon(Icons.refresh, size: 18),
                       label: const Text('Reconnect'),
                       style: OutlinedButton.styleFrom(
@@ -117,8 +92,6 @@ class FarmCard extends ConsumerWidget {
                     ),
                   ),
                 ),
-
-              // Production stats
               Row(
                 children: [
                   _StatChip(
@@ -136,7 +109,6 @@ class FarmCard extends ConsumerWidget {
                   ),
                 ],
               ),
-
               if (farm.location != null) ...[
                 const SizedBox(height: 12),
                 Row(
@@ -164,10 +136,8 @@ class FarmCard extends ConsumerWidget {
   }
 }
 
-/// Connection status indicator
 class _ConnectionIndicator extends StatelessWidget {
   const _ConnectionIndicator({required this.isConnected});
-
   final bool isConnected;
 
   @override
@@ -176,8 +146,8 @@ class _ConnectionIndicator extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: isConnected
-            ? Colors.green.withOpacity(0.1)
-            : Colors.grey.withOpacity(0.1),
+            ? Colors.green.withValues(alpha: 0.1)
+            : Colors.grey.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isConnected ? Colors.green : Colors.grey,
@@ -210,7 +180,6 @@ class _ConnectionIndicator extends StatelessWidget {
   }
 }
 
-/// Stat chip showing metric
 class _StatChip extends StatelessWidget {
   const _StatChip({
     required this.icon,
@@ -230,7 +199,7 @@ class _StatChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(

@@ -8,13 +8,6 @@ import '../widgets/farm_card.dart';
 import '../widgets/theme_selector.dart';
 import '../data/models/farm.dart';
 
-/// Home screen showing overview of all farms.
-///
-/// Displays:
-/// - List of all farms as cards
-/// - Total production statistics
-/// - Quick actions (add farm, settings)
-/// - Performance indicators
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -25,16 +18,13 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Farms'),
-        actions: [
-          // Theme toggle
-          const ThemeToggleButton(),
-        ],
+        actions: const [ThemeToggleButton()],
       ),
       body: farmsAsync.when(
         data: (farms) {
           if (farms.isEmpty) {
             return _EmptyFarmsView(
-              onAddFarm: () => context.push('/farms/scan'),
+              onAddFarm: () => context.push('/farms/add'),
             );
           }
 
@@ -42,7 +32,6 @@ class HomeScreen extends ConsumerWidget {
             onRefresh: () => ref.refresh(activeFarmsProvider.future),
             child: CustomScrollView(
               slivers: [
-                // Header stats
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -52,8 +41,6 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-
-                // Farm cards
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   sliver: SliverList(
@@ -63,8 +50,9 @@ class HomeScreen extends ConsumerWidget {
                         return FarmCard(
                           farm: farm,
                           onTap: () {
-                            // Set the farm for monitoring and navigate to monitoring tab
-                            ref.read(selectedMonitoringFarmIdProvider.notifier).state = farm.id;
+                            ref
+                                .read(selectedMonitoringFarmIdProvider.notifier)
+                                .state = farm.id;
                             context.go('/monitoring');
                           },
                         );
@@ -73,37 +61,25 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 80), // FAB padding
-                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
               ],
             ),
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Theme.of(context).colorScheme.error,
-              ),
+              Icon(Icons.error_outline,
+                  size: 64, color: Theme.of(context).colorScheme.error),
               const SizedBox(height: 16),
-              Text(
-                'Error loading farms',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+              Text('Error loading farms',
+                  style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-              Text(
-                error.toString(),
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
+              Text(error.toString(),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: () => ref.invalidate(activeFarmsProvider),
@@ -115,7 +91,7 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/farms/scan'),
+        onPressed: () => context.push('/farms/add'),
         icon: const Icon(Icons.add),
         label: const Text('Add Farm'),
       ),
@@ -123,10 +99,8 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// Empty state when no farms exist
 class _EmptyFarmsView extends StatelessWidget {
   const _EmptyFarmsView({required this.onAddFarm});
-
   final VoidCallback onAddFarm;
 
   @override
@@ -137,17 +111,16 @@ class _EmptyFarmsView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.eco_outlined,
-              size: 120,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-            ),
+            Icon(Icons.eco_outlined,
+                size: 120,
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.5)),
             const SizedBox(height: 24),
-            Text(
-              'No Farms Yet',
-              style: Theme.of(context).textTheme.headlineMedium,
-              textAlign: TextAlign.center,
-            ),
+            Text('No Farms Yet',
+                style: Theme.of(context).textTheme.headlineMedium,
+                textAlign: TextAlign.center),
             const SizedBox(height: 12),
             Text(
               'Start your mushroom cultivation journey by adding your first farm.',
@@ -162,10 +135,8 @@ class _EmptyFarmsView extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('Add Your First Farm'),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
             ),
           ],
@@ -175,17 +146,11 @@ class _EmptyFarmsView extends StatelessWidget {
   }
 }
 
-/// Statistics header showing aggregate data
 class _StatsHeader extends StatelessWidget {
-  const _StatsHeader({
-    required this.farmCount,
-    required this.farms,
-  });
-
+  const _StatsHeader({required this.farmCount, required this.farms});
   final int farmCount;
   final List<Farm> farms;
 
-  /// Count farms that are currently online (last active within 1 minute)
   int _countOnlineFarms(List<Farm> farms) {
     final now = DateTime.now();
     return farms.where((farm) {
@@ -212,11 +177,7 @@ class _StatsHeader extends StatelessWidget {
                 color: colorScheme.primary,
               ),
             ),
-            Container(
-              width: 1,
-              height: 40,
-              color: colorScheme.outlineVariant,
-            ),
+            Container(width: 1, height: 40, color: colorScheme.outlineVariant),
             Expanded(
               child: _StatItem(
                 icon: Icons.check_circle_outline,
@@ -232,7 +193,6 @@ class _StatsHeader extends StatelessWidget {
   }
 }
 
-/// Individual stat item
 class _StatItem extends StatelessWidget {
   const _StatItem({
     required this.icon,
@@ -240,7 +200,6 @@ class _StatItem extends StatelessWidget {
     required this.value,
     required this.color,
   });
-
   final IconData icon;
   final String label;
   final String value;
@@ -252,18 +211,13 @@ class _StatItem extends StatelessWidget {
       children: [
         Icon(icon, color: color, size: 32),
         const SizedBox(height: 8),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-        ),
+        Text(value,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                )),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }

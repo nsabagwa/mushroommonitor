@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mushpi_hub/providers/database_provider.dart';
 import 'package:mushpi_hub/providers/farms_provider.dart';
-import 'package:mushpi_hub/providers/ble_provider.dart';
 import 'dart:developer' as developer;
 
 /// Theme mode provider
@@ -19,7 +18,7 @@ import 'dart:developer' as developer;
 ///   themeMode: themeMode,
 ///   ...
 /// );
-/// 
+///
 /// // To change theme:
 /// ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark);
 /// ```
@@ -41,10 +40,10 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
     try {
       // Load theme mode from settings
       final themeModeString = await _settingsDao.getThemeMode();
-      
+
       if (themeModeString != null) {
         state = _parseThemeMode(themeModeString);
-        
+
         developer.log(
           'Restored theme mode: ${state.name}',
           name: 'mushpi.providers.app_state',
@@ -122,7 +121,7 @@ final appInitializationProvider = FutureProvider<void>((ref) async {
 
     // Load initial data (optional pre-caching)
     // Farms will be lazy-loaded when needed
-    
+
     // Small delay to show splash screen
     await Future.delayed(const Duration(milliseconds: 500));
 
@@ -157,7 +156,7 @@ final appInitializationProvider = FutureProvider<void>((ref) async {
 /// ```
 final notificationsEnabledProvider = FutureProvider<bool>((ref) async {
   final settingsDao = ref.watch(settingsDaoProvider);
-  
+
   try {
     final enabled = await settingsDao.getNotificationsEnabled();
     return enabled;
@@ -183,7 +182,7 @@ final notificationsEnabledProvider = FutureProvider<bool>((ref) async {
 /// ```
 final autoReconnectEnabledProvider = FutureProvider<bool>((ref) async {
   final settingsDao = ref.watch(settingsDaoProvider);
-  
+
   try {
     final enabled = await settingsDao.getAutoReconnect();
     return enabled;
@@ -209,7 +208,7 @@ final autoReconnectEnabledProvider = FutureProvider<bool>((ref) async {
 /// ```
 final dataRetentionDaysProvider = FutureProvider<int>((ref) async {
   final settingsDao = ref.watch(settingsDaoProvider);
-  
+
   try {
     final days = await settingsDao.getDataRetentionDays();
     return days;
@@ -235,7 +234,7 @@ final dataRetentionDaysProvider = FutureProvider<int>((ref) async {
 /// ```
 final chartTimeRangeProvider = FutureProvider<String>((ref) async {
   final settingsDao = ref.watch(settingsDaoProvider);
-  
+
   try {
     final range = await settingsDao.getChartTimeRange();
     return range;
@@ -284,7 +283,7 @@ class AppSettingsOperations {
       );
 
       await settingsDao.setValue('notifications_enabled', enabled ? '1' : '0');
-      
+
       // Refresh provider
       ref.invalidate(notificationsEnabledProvider);
     } catch (error, stackTrace) {
@@ -307,7 +306,7 @@ class AppSettingsOperations {
       );
 
       await settingsDao.setValue('auto_reconnect', enabled ? '1' : '0');
-      
+
       // Refresh provider
       ref.invalidate(autoReconnectEnabledProvider);
     } catch (error, stackTrace) {
@@ -330,7 +329,7 @@ class AppSettingsOperations {
       );
 
       await settingsDao.setValue('data_retention_days', days.toString());
-      
+
       // Refresh provider
       ref.invalidate(dataRetentionDaysProvider);
     } catch (error, stackTrace) {
@@ -353,7 +352,7 @@ class AppSettingsOperations {
       );
 
       await settingsDao.setValue('chart_time_range', range);
-      
+
       // Refresh provider
       ref.invalidate(chartTimeRangeProvider);
     } catch (error, stackTrace) {
@@ -377,12 +376,12 @@ class AppSettingsOperations {
 
       // Clear environmental readings (keep farms and harvests)
       final database = ref.read(databaseProvider);
-      
+
       // This would need a method in the database to clear readings
       // For now, we can delete old readings
       final retentionDays = await settingsDao.getDataRetentionDays() ?? 90;
       final cutoffDate = DateTime.now().subtract(Duration(days: retentionDays));
-      
+
       await database.readingsDao.deleteReadingsOlderThan(cutoffDate);
 
       developer.log(
@@ -410,7 +409,7 @@ class AppSettingsOperations {
       );
 
       await settingsDao.deleteAllSettings();
-      
+
       // Refresh all setting providers
       ref.invalidate(themeModeProvider);
       ref.invalidate(notificationsEnabledProvider);
@@ -453,21 +452,13 @@ class AppSettingsOperations {
 /// ```
 final appHealthStatusProvider = FutureProvider<AppHealthStatus>((ref) async {
   try {
-    // Check database (always available via provider)
     const dbHealthy = true;
-
-    // Check farms
     final farmsResult = await ref.watch(activeFarmsProvider.future);
     final farmsCount = farmsResult.length;
-
-    // Check BLE availability
-    final bleOps = ref.watch(bleOperationsProvider);
-    final bleAvailable = await bleOps.isBluetoothAvailable();
 
     return AppHealthStatus(
       databaseHealthy: dbHealthy,
       activeFarmsCount: farmsCount,
-      bluetoothAvailable: bleAvailable,
       lastCheckTime: DateTime.now(),
     );
   } catch (error, stackTrace) {
@@ -478,11 +469,10 @@ final appHealthStatusProvider = FutureProvider<AppHealthStatus>((ref) async {
       stackTrace: stackTrace,
       level: 1000,
     );
-    
+
     return AppHealthStatus(
       databaseHealthy: false,
       activeFarmsCount: 0,
-      bluetoothAvailable: false,
       lastCheckTime: DateTime.now(),
     );
   }
@@ -493,26 +483,17 @@ class AppHealthStatus {
   const AppHealthStatus({
     required this.databaseHealthy,
     required this.activeFarmsCount,
-    required this.bluetoothAvailable,
     required this.lastCheckTime,
   });
 
   final bool databaseHealthy;
   final int activeFarmsCount;
-  final bool bluetoothAvailable;
   final DateTime lastCheckTime;
 
-  bool get isHealthy => databaseHealthy && bluetoothAvailable;
-  
+  bool get isHealthy => databaseHealthy;
+
   String get statusMessage {
-    if (isHealthy) {
-      return 'App is running smoothly';
-    }
-    
-    final issues = <String>[];
-    if (!databaseHealthy) issues.add('Database issue');
-    if (!bluetoothAvailable) issues.add('Bluetooth unavailable');
-    
-    return 'Issues: ${issues.join(', ')}';
+    if (isHealthy) return 'App is running smoothly';
+    return 'Issues: Database issue';
   }
 }

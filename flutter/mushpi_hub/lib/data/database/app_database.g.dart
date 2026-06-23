@@ -18,14 +18,26 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
       'name', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _deviceIdMeta =
-      const VerificationMeta('deviceId');
+  static const VerificationMeta _thingSpeakChannelIdMeta =
+      const VerificationMeta('thingSpeakChannelId');
   @override
-  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
-      'device_id', aliasedName, false,
-      type: DriftSqlType.string,
-      requiredDuringInsert: true,
-      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  late final GeneratedColumn<String> thingSpeakChannelId =
+      GeneratedColumn<String>('thing_speak_channel_id', aliasedName, false,
+          type: DriftSqlType.string,
+          requiredDuringInsert: true,
+          defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  static const VerificationMeta _thingSpeakReadApiKeyMeta =
+      const VerificationMeta('thingSpeakReadApiKey');
+  @override
+  late final GeneratedColumn<String> thingSpeakReadApiKey =
+      GeneratedColumn<String>('thing_speak_read_api_key', aliasedName, false,
+          type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _thingSpeakFieldMapMeta =
+      const VerificationMeta('thingSpeakFieldMap');
+  @override
+  late final GeneratedColumn<String> thingSpeakFieldMap =
+      GeneratedColumn<String>('thing_speak_field_map', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _locationMeta =
       const VerificationMeta('location');
   @override
@@ -97,7 +109,9 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
   List<GeneratedColumn> get $columns => [
         id,
         name,
-        deviceId,
+        thingSpeakChannelId,
+        thingSpeakReadApiKey,
+        thingSpeakFieldMap,
         location,
         notes,
         createdAt,
@@ -130,11 +144,27 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
-    if (data.containsKey('device_id')) {
-      context.handle(_deviceIdMeta,
-          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    if (data.containsKey('thing_speak_channel_id')) {
+      context.handle(
+          _thingSpeakChannelIdMeta,
+          thingSpeakChannelId.isAcceptableOrUnknown(
+              data['thing_speak_channel_id']!, _thingSpeakChannelIdMeta));
     } else if (isInserting) {
-      context.missing(_deviceIdMeta);
+      context.missing(_thingSpeakChannelIdMeta);
+    }
+    if (data.containsKey('thing_speak_read_api_key')) {
+      context.handle(
+          _thingSpeakReadApiKeyMeta,
+          thingSpeakReadApiKey.isAcceptableOrUnknown(
+              data['thing_speak_read_api_key']!, _thingSpeakReadApiKeyMeta));
+    } else if (isInserting) {
+      context.missing(_thingSpeakReadApiKeyMeta);
+    }
+    if (data.containsKey('thing_speak_field_map')) {
+      context.handle(
+          _thingSpeakFieldMapMeta,
+          thingSpeakFieldMap.isAcceptableOrUnknown(
+              data['thing_speak_field_map']!, _thingSpeakFieldMapMeta));
     }
     if (data.containsKey('location')) {
       context.handle(_locationMeta,
@@ -199,8 +229,14 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
           .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
       name: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
-      deviceId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
+      thingSpeakChannelId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}thing_speak_channel_id'])!,
+      thingSpeakReadApiKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}thing_speak_read_api_key'])!,
+      thingSpeakFieldMap: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}thing_speak_field_map']),
       location: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}location']),
       notes: attachedDatabase.typeMapping
@@ -233,7 +269,9 @@ class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
 class Farm extends DataClass implements Insertable<Farm> {
   final String id;
   final String name;
-  final String deviceId;
+  final String thingSpeakChannelId;
+  final String thingSpeakReadApiKey;
+  final String? thingSpeakFieldMap;
   final String? location;
   final String? notes;
   final DateTime createdAt;
@@ -247,7 +285,9 @@ class Farm extends DataClass implements Insertable<Farm> {
   const Farm(
       {required this.id,
       required this.name,
-      required this.deviceId,
+      required this.thingSpeakChannelId,
+      required this.thingSpeakReadApiKey,
+      this.thingSpeakFieldMap,
       this.location,
       this.notes,
       required this.createdAt,
@@ -263,7 +303,11 @@ class Farm extends DataClass implements Insertable<Farm> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
-    map['device_id'] = Variable<String>(deviceId);
+    map['thing_speak_channel_id'] = Variable<String>(thingSpeakChannelId);
+    map['thing_speak_read_api_key'] = Variable<String>(thingSpeakReadApiKey);
+    if (!nullToAbsent || thingSpeakFieldMap != null) {
+      map['thing_speak_field_map'] = Variable<String>(thingSpeakFieldMap);
+    }
     if (!nullToAbsent || location != null) {
       map['location'] = Variable<String>(location);
     }
@@ -293,7 +337,11 @@ class Farm extends DataClass implements Insertable<Farm> {
     return FarmsCompanion(
       id: Value(id),
       name: Value(name),
-      deviceId: Value(deviceId),
+      thingSpeakChannelId: Value(thingSpeakChannelId),
+      thingSpeakReadApiKey: Value(thingSpeakReadApiKey),
+      thingSpeakFieldMap: thingSpeakFieldMap == null && nullToAbsent
+          ? const Value.absent()
+          : Value(thingSpeakFieldMap),
       location: location == null && nullToAbsent
           ? const Value.absent()
           : Value(location),
@@ -324,7 +372,12 @@ class Farm extends DataClass implements Insertable<Farm> {
     return Farm(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
-      deviceId: serializer.fromJson<String>(json['deviceId']),
+      thingSpeakChannelId:
+          serializer.fromJson<String>(json['thingSpeakChannelId']),
+      thingSpeakReadApiKey:
+          serializer.fromJson<String>(json['thingSpeakReadApiKey']),
+      thingSpeakFieldMap:
+          serializer.fromJson<String?>(json['thingSpeakFieldMap']),
       location: serializer.fromJson<String?>(json['location']),
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -343,7 +396,9 @@ class Farm extends DataClass implements Insertable<Farm> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
-      'deviceId': serializer.toJson<String>(deviceId),
+      'thingSpeakChannelId': serializer.toJson<String>(thingSpeakChannelId),
+      'thingSpeakReadApiKey': serializer.toJson<String>(thingSpeakReadApiKey),
+      'thingSpeakFieldMap': serializer.toJson<String?>(thingSpeakFieldMap),
       'location': serializer.toJson<String?>(location),
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -360,7 +415,9 @@ class Farm extends DataClass implements Insertable<Farm> {
   Farm copyWith(
           {String? id,
           String? name,
-          String? deviceId,
+          String? thingSpeakChannelId,
+          String? thingSpeakReadApiKey,
+          Value<String?> thingSpeakFieldMap = const Value.absent(),
           Value<String?> location = const Value.absent(),
           Value<String?> notes = const Value.absent(),
           DateTime? createdAt,
@@ -374,7 +431,11 @@ class Farm extends DataClass implements Insertable<Farm> {
       Farm(
         id: id ?? this.id,
         name: name ?? this.name,
-        deviceId: deviceId ?? this.deviceId,
+        thingSpeakChannelId: thingSpeakChannelId ?? this.thingSpeakChannelId,
+        thingSpeakReadApiKey: thingSpeakReadApiKey ?? this.thingSpeakReadApiKey,
+        thingSpeakFieldMap: thingSpeakFieldMap.present
+            ? thingSpeakFieldMap.value
+            : this.thingSpeakFieldMap,
         location: location.present ? location.value : this.location,
         notes: notes.present ? notes.value : this.notes,
         createdAt: createdAt ?? this.createdAt,
@@ -391,7 +452,15 @@ class Farm extends DataClass implements Insertable<Farm> {
     return Farm(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
-      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      thingSpeakChannelId: data.thingSpeakChannelId.present
+          ? data.thingSpeakChannelId.value
+          : this.thingSpeakChannelId,
+      thingSpeakReadApiKey: data.thingSpeakReadApiKey.present
+          ? data.thingSpeakReadApiKey.value
+          : this.thingSpeakReadApiKey,
+      thingSpeakFieldMap: data.thingSpeakFieldMap.present
+          ? data.thingSpeakFieldMap.value
+          : this.thingSpeakFieldMap,
       location: data.location.present ? data.location.value : this.location,
       notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -417,7 +486,9 @@ class Farm extends DataClass implements Insertable<Farm> {
     return (StringBuffer('Farm(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('deviceId: $deviceId, ')
+          ..write('thingSpeakChannelId: $thingSpeakChannelId, ')
+          ..write('thingSpeakReadApiKey: $thingSpeakReadApiKey, ')
+          ..write('thingSpeakFieldMap: $thingSpeakFieldMap, ')
           ..write('location: $location, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
@@ -436,7 +507,9 @@ class Farm extends DataClass implements Insertable<Farm> {
   int get hashCode => Object.hash(
       id,
       name,
-      deviceId,
+      thingSpeakChannelId,
+      thingSpeakReadApiKey,
+      thingSpeakFieldMap,
       location,
       notes,
       createdAt,
@@ -453,7 +526,9 @@ class Farm extends DataClass implements Insertable<Farm> {
       (other is Farm &&
           other.id == this.id &&
           other.name == this.name &&
-          other.deviceId == this.deviceId &&
+          other.thingSpeakChannelId == this.thingSpeakChannelId &&
+          other.thingSpeakReadApiKey == this.thingSpeakReadApiKey &&
+          other.thingSpeakFieldMap == this.thingSpeakFieldMap &&
           other.location == this.location &&
           other.notes == this.notes &&
           other.createdAt == this.createdAt &&
@@ -469,7 +544,9 @@ class Farm extends DataClass implements Insertable<Farm> {
 class FarmsCompanion extends UpdateCompanion<Farm> {
   final Value<String> id;
   final Value<String> name;
-  final Value<String> deviceId;
+  final Value<String> thingSpeakChannelId;
+  final Value<String> thingSpeakReadApiKey;
+  final Value<String?> thingSpeakFieldMap;
   final Value<String?> location;
   final Value<String?> notes;
   final Value<DateTime> createdAt;
@@ -484,7 +561,9 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
   const FarmsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
-    this.deviceId = const Value.absent(),
+    this.thingSpeakChannelId = const Value.absent(),
+    this.thingSpeakReadApiKey = const Value.absent(),
+    this.thingSpeakFieldMap = const Value.absent(),
     this.location = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -500,7 +579,9 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
   FarmsCompanion.insert({
     required String id,
     required String name,
-    required String deviceId,
+    required String thingSpeakChannelId,
+    required String thingSpeakReadApiKey,
+    this.thingSpeakFieldMap = const Value.absent(),
     this.location = const Value.absent(),
     this.notes = const Value.absent(),
     required DateTime createdAt,
@@ -514,12 +595,15 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name),
-        deviceId = Value(deviceId),
+        thingSpeakChannelId = Value(thingSpeakChannelId),
+        thingSpeakReadApiKey = Value(thingSpeakReadApiKey),
         createdAt = Value(createdAt);
   static Insertable<Farm> custom({
     Expression<String>? id,
     Expression<String>? name,
-    Expression<String>? deviceId,
+    Expression<String>? thingSpeakChannelId,
+    Expression<String>? thingSpeakReadApiKey,
+    Expression<String>? thingSpeakFieldMap,
     Expression<String>? location,
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
@@ -535,7 +619,12 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
-      if (deviceId != null) 'device_id': deviceId,
+      if (thingSpeakChannelId != null)
+        'thing_speak_channel_id': thingSpeakChannelId,
+      if (thingSpeakReadApiKey != null)
+        'thing_speak_read_api_key': thingSpeakReadApiKey,
+      if (thingSpeakFieldMap != null)
+        'thing_speak_field_map': thingSpeakFieldMap,
       if (location != null) 'location': location,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
@@ -553,7 +642,9 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
   FarmsCompanion copyWith(
       {Value<String>? id,
       Value<String>? name,
-      Value<String>? deviceId,
+      Value<String>? thingSpeakChannelId,
+      Value<String>? thingSpeakReadApiKey,
+      Value<String?>? thingSpeakFieldMap,
       Value<String?>? location,
       Value<String?>? notes,
       Value<DateTime>? createdAt,
@@ -568,7 +659,9 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     return FarmsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
-      deviceId: deviceId ?? this.deviceId,
+      thingSpeakChannelId: thingSpeakChannelId ?? this.thingSpeakChannelId,
+      thingSpeakReadApiKey: thingSpeakReadApiKey ?? this.thingSpeakReadApiKey,
+      thingSpeakFieldMap: thingSpeakFieldMap ?? this.thingSpeakFieldMap,
       location: location ?? this.location,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
@@ -592,8 +685,16 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     if (name.present) {
       map['name'] = Variable<String>(name.value);
     }
-    if (deviceId.present) {
-      map['device_id'] = Variable<String>(deviceId.value);
+    if (thingSpeakChannelId.present) {
+      map['thing_speak_channel_id'] =
+          Variable<String>(thingSpeakChannelId.value);
+    }
+    if (thingSpeakReadApiKey.present) {
+      map['thing_speak_read_api_key'] =
+          Variable<String>(thingSpeakReadApiKey.value);
+    }
+    if (thingSpeakFieldMap.present) {
+      map['thing_speak_field_map'] = Variable<String>(thingSpeakFieldMap.value);
     }
     if (location.present) {
       map['location'] = Variable<String>(location.value);
@@ -636,7 +737,9 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     return (StringBuffer('FarmsCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('deviceId: $deviceId, ')
+          ..write('thingSpeakChannelId: $thingSpeakChannelId, ')
+          ..write('thingSpeakReadApiKey: $thingSpeakReadApiKey, ')
+          ..write('thingSpeakFieldMap: $thingSpeakFieldMap, ')
           ..write('location: $location, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
@@ -1204,322 +1307,6 @@ class HarvestsCompanion extends UpdateCompanion<Harvest> {
           ..write('notes: $notes, ')
           ..write('photoUrls: $photoUrls, ')
           ..write('metadata: $metadata, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $DevicesTable extends Devices with TableInfo<$DevicesTable, Device> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $DevicesTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _deviceIdMeta =
-      const VerificationMeta('deviceId');
-  @override
-  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
-      'device_id', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-      'name', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _addressMeta =
-      const VerificationMeta('address');
-  @override
-  late final GeneratedColumn<String> address = GeneratedColumn<String>(
-      'address', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _farmIdMeta = const VerificationMeta('farmId');
-  @override
-  late final GeneratedColumn<String> farmId = GeneratedColumn<String>(
-      'farm_id', aliasedName, true,
-      type: DriftSqlType.string,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('REFERENCES farms (id)'));
-  static const VerificationMeta _lastConnectedMeta =
-      const VerificationMeta('lastConnected');
-  @override
-  late final GeneratedColumn<DateTime> lastConnected =
-      GeneratedColumn<DateTime>('last_connected', aliasedName, false,
-          type: DriftSqlType.dateTime, requiredDuringInsert: true);
-  @override
-  List<GeneratedColumn> get $columns =>
-      [deviceId, name, address, farmId, lastConnected];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'devices';
-  @override
-  VerificationContext validateIntegrity(Insertable<Device> instance,
-      {bool isInserting = false}) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('device_id')) {
-      context.handle(_deviceIdMeta,
-          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
-    } else if (isInserting) {
-      context.missing(_deviceIdMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('address')) {
-      context.handle(_addressMeta,
-          address.isAcceptableOrUnknown(data['address']!, _addressMeta));
-    } else if (isInserting) {
-      context.missing(_addressMeta);
-    }
-    if (data.containsKey('farm_id')) {
-      context.handle(_farmIdMeta,
-          farmId.isAcceptableOrUnknown(data['farm_id']!, _farmIdMeta));
-    }
-    if (data.containsKey('last_connected')) {
-      context.handle(
-          _lastConnectedMeta,
-          lastConnected.isAcceptableOrUnknown(
-              data['last_connected']!, _lastConnectedMeta));
-    } else if (isInserting) {
-      context.missing(_lastConnectedMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {deviceId};
-  @override
-  Device map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Device(
-      deviceId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
-      name: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
-      address: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}address'])!,
-      farmId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}farm_id']),
-      lastConnected: attachedDatabase.typeMapping.read(
-          DriftSqlType.dateTime, data['${effectivePrefix}last_connected'])!,
-    );
-  }
-
-  @override
-  $DevicesTable createAlias(String alias) {
-    return $DevicesTable(attachedDatabase, alias);
-  }
-}
-
-class Device extends DataClass implements Insertable<Device> {
-  final String deviceId;
-  final String name;
-  final String address;
-  final String? farmId;
-  final DateTime lastConnected;
-  const Device(
-      {required this.deviceId,
-      required this.name,
-      required this.address,
-      this.farmId,
-      required this.lastConnected});
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['device_id'] = Variable<String>(deviceId);
-    map['name'] = Variable<String>(name);
-    map['address'] = Variable<String>(address);
-    if (!nullToAbsent || farmId != null) {
-      map['farm_id'] = Variable<String>(farmId);
-    }
-    map['last_connected'] = Variable<DateTime>(lastConnected);
-    return map;
-  }
-
-  DevicesCompanion toCompanion(bool nullToAbsent) {
-    return DevicesCompanion(
-      deviceId: Value(deviceId),
-      name: Value(name),
-      address: Value(address),
-      farmId:
-          farmId == null && nullToAbsent ? const Value.absent() : Value(farmId),
-      lastConnected: Value(lastConnected),
-    );
-  }
-
-  factory Device.fromJson(Map<String, dynamic> json,
-      {ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Device(
-      deviceId: serializer.fromJson<String>(json['deviceId']),
-      name: serializer.fromJson<String>(json['name']),
-      address: serializer.fromJson<String>(json['address']),
-      farmId: serializer.fromJson<String?>(json['farmId']),
-      lastConnected: serializer.fromJson<DateTime>(json['lastConnected']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'deviceId': serializer.toJson<String>(deviceId),
-      'name': serializer.toJson<String>(name),
-      'address': serializer.toJson<String>(address),
-      'farmId': serializer.toJson<String?>(farmId),
-      'lastConnected': serializer.toJson<DateTime>(lastConnected),
-    };
-  }
-
-  Device copyWith(
-          {String? deviceId,
-          String? name,
-          String? address,
-          Value<String?> farmId = const Value.absent(),
-          DateTime? lastConnected}) =>
-      Device(
-        deviceId: deviceId ?? this.deviceId,
-        name: name ?? this.name,
-        address: address ?? this.address,
-        farmId: farmId.present ? farmId.value : this.farmId,
-        lastConnected: lastConnected ?? this.lastConnected,
-      );
-  Device copyWithCompanion(DevicesCompanion data) {
-    return Device(
-      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
-      name: data.name.present ? data.name.value : this.name,
-      address: data.address.present ? data.address.value : this.address,
-      farmId: data.farmId.present ? data.farmId.value : this.farmId,
-      lastConnected: data.lastConnected.present
-          ? data.lastConnected.value
-          : this.lastConnected,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('Device(')
-          ..write('deviceId: $deviceId, ')
-          ..write('name: $name, ')
-          ..write('address: $address, ')
-          ..write('farmId: $farmId, ')
-          ..write('lastConnected: $lastConnected')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(deviceId, name, address, farmId, lastConnected);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is Device &&
-          other.deviceId == this.deviceId &&
-          other.name == this.name &&
-          other.address == this.address &&
-          other.farmId == this.farmId &&
-          other.lastConnected == this.lastConnected);
-}
-
-class DevicesCompanion extends UpdateCompanion<Device> {
-  final Value<String> deviceId;
-  final Value<String> name;
-  final Value<String> address;
-  final Value<String?> farmId;
-  final Value<DateTime> lastConnected;
-  final Value<int> rowid;
-  const DevicesCompanion({
-    this.deviceId = const Value.absent(),
-    this.name = const Value.absent(),
-    this.address = const Value.absent(),
-    this.farmId = const Value.absent(),
-    this.lastConnected = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  DevicesCompanion.insert({
-    required String deviceId,
-    required String name,
-    required String address,
-    this.farmId = const Value.absent(),
-    required DateTime lastConnected,
-    this.rowid = const Value.absent(),
-  })  : deviceId = Value(deviceId),
-        name = Value(name),
-        address = Value(address),
-        lastConnected = Value(lastConnected);
-  static Insertable<Device> custom({
-    Expression<String>? deviceId,
-    Expression<String>? name,
-    Expression<String>? address,
-    Expression<String>? farmId,
-    Expression<DateTime>? lastConnected,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (deviceId != null) 'device_id': deviceId,
-      if (name != null) 'name': name,
-      if (address != null) 'address': address,
-      if (farmId != null) 'farm_id': farmId,
-      if (lastConnected != null) 'last_connected': lastConnected,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  DevicesCompanion copyWith(
-      {Value<String>? deviceId,
-      Value<String>? name,
-      Value<String>? address,
-      Value<String?>? farmId,
-      Value<DateTime>? lastConnected,
-      Value<int>? rowid}) {
-    return DevicesCompanion(
-      deviceId: deviceId ?? this.deviceId,
-      name: name ?? this.name,
-      address: address ?? this.address,
-      farmId: farmId ?? this.farmId,
-      lastConnected: lastConnected ?? this.lastConnected,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (deviceId.present) {
-      map['device_id'] = Variable<String>(deviceId.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (address.present) {
-      map['address'] = Variable<String>(address.value);
-    }
-    if (farmId.present) {
-      map['farm_id'] = Variable<String>(farmId.value);
-    }
-    if (lastConnected.present) {
-      map['last_connected'] = Variable<DateTime>(lastConnected.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DevicesCompanion(')
-          ..write('deviceId: $deviceId, ')
-          ..write('name: $name, ')
-          ..write('address: $address, ')
-          ..write('farmId: $farmId, ')
-          ..write('lastConnected: $lastConnected, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2141,26 +1928,26 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $FarmsTable farms = $FarmsTable(this);
   late final $HarvestsTable harvests = $HarvestsTable(this);
-  late final $DevicesTable devices = $DevicesTable(this);
   late final $ReadingsTable readings = $ReadingsTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
   late final FarmsDao farmsDao = FarmsDao(this as AppDatabase);
   late final HarvestsDao harvestsDao = HarvestsDao(this as AppDatabase);
   late final ReadingsDao readingsDao = ReadingsDao(this as AppDatabase);
-  late final DevicesDao devicesDao = DevicesDao(this as AppDatabase);
   late final SettingsDao settingsDao = SettingsDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [farms, harvests, devices, readings, settings];
+      [farms, harvests, readings, settings];
 }
 
 typedef $$FarmsTableCreateCompanionBuilder = FarmsCompanion Function({
   required String id,
   required String name,
-  required String deviceId,
+  required String thingSpeakChannelId,
+  required String thingSpeakReadApiKey,
+  Value<String?> thingSpeakFieldMap,
   Value<String?> location,
   Value<String?> notes,
   required DateTime createdAt,
@@ -2176,7 +1963,9 @@ typedef $$FarmsTableCreateCompanionBuilder = FarmsCompanion Function({
 typedef $$FarmsTableUpdateCompanionBuilder = FarmsCompanion Function({
   Value<String> id,
   Value<String> name,
-  Value<String> deviceId,
+  Value<String> thingSpeakChannelId,
+  Value<String> thingSpeakReadApiKey,
+  Value<String?> thingSpeakFieldMap,
   Value<String?> location,
   Value<String?> notes,
   Value<DateTime> createdAt,
@@ -2204,20 +1993,6 @@ final class $$FarmsTableReferences
         .filter((f) => f.farmId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_harvestsRefsTable($_db));
-    return ProcessedTableManager(
-        manager.$state.copyWith(prefetchedData: cache));
-  }
-
-  static MultiTypedResultKey<$DevicesTable, List<Device>> _devicesRefsTable(
-          _$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(db.devices,
-          aliasName: $_aliasNameGenerator(db.farms.id, db.devices.farmId));
-
-  $$DevicesTableProcessedTableManager get devicesRefs {
-    final manager = $$DevicesTableTableManager($_db, $_db.devices)
-        .filter((f) => f.farmId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_devicesRefsTable($_db));
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: cache));
   }
@@ -2251,8 +2026,17 @@ class $$FarmsTableFilterComposer extends Composer<_$AppDatabase, $FarmsTable> {
   ColumnFilters<String> get name => $composableBuilder(
       column: $table.name, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get deviceId => $composableBuilder(
-      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get thingSpeakChannelId => $composableBuilder(
+      column: $table.thingSpeakChannelId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get thingSpeakReadApiKey => $composableBuilder(
+      column: $table.thingSpeakReadApiKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get thingSpeakFieldMap => $composableBuilder(
+      column: $table.thingSpeakFieldMap,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get location => $composableBuilder(
       column: $table.location, builder: (column) => ColumnFilters(column));
@@ -2306,27 +2090,6 @@ class $$FarmsTableFilterComposer extends Composer<_$AppDatabase, $FarmsTable> {
     return f(composer);
   }
 
-  Expression<bool> devicesRefs(
-      Expression<bool> Function($$DevicesTableFilterComposer f) f) {
-    final $$DevicesTableFilterComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $db.devices,
-        getReferencedColumn: (t) => t.farmId,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$DevicesTableFilterComposer(
-              $db: $db,
-              $table: $db.devices,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-
   Expression<bool> readingsRefs(
       Expression<bool> Function($$ReadingsTableFilterComposer f) f) {
     final $$ReadingsTableFilterComposer composer = $composerBuilder(
@@ -2364,8 +2127,17 @@ class $$FarmsTableOrderingComposer
   ColumnOrderings<String> get name => $composableBuilder(
       column: $table.name, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get deviceId => $composableBuilder(
-      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get thingSpeakChannelId => $composableBuilder(
+      column: $table.thingSpeakChannelId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get thingSpeakReadApiKey => $composableBuilder(
+      column: $table.thingSpeakReadApiKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get thingSpeakFieldMap => $composableBuilder(
+      column: $table.thingSpeakFieldMap,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get location => $composableBuilder(
       column: $table.location, builder: (column) => ColumnOrderings(column));
@@ -2416,8 +2188,14 @@ class $$FarmsTableAnnotationComposer
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
-  GeneratedColumn<String> get deviceId =>
-      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+  GeneratedColumn<String> get thingSpeakChannelId => $composableBuilder(
+      column: $table.thingSpeakChannelId, builder: (column) => column);
+
+  GeneratedColumn<String> get thingSpeakReadApiKey => $composableBuilder(
+      column: $table.thingSpeakReadApiKey, builder: (column) => column);
+
+  GeneratedColumn<String> get thingSpeakFieldMap => $composableBuilder(
+      column: $table.thingSpeakFieldMap, builder: (column) => column);
 
   GeneratedColumn<String> get location =>
       $composableBuilder(column: $table.location, builder: (column) => column);
@@ -2470,27 +2248,6 @@ class $$FarmsTableAnnotationComposer
     return f(composer);
   }
 
-  Expression<T> devicesRefs<T extends Object>(
-      Expression<T> Function($$DevicesTableAnnotationComposer a) f) {
-    final $$DevicesTableAnnotationComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $db.devices,
-        getReferencedColumn: (t) => t.farmId,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$DevicesTableAnnotationComposer(
-              $db: $db,
-              $table: $db.devices,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-
   Expression<T> readingsRefs<T extends Object>(
       Expression<T> Function($$ReadingsTableAnnotationComposer a) f) {
     final $$ReadingsTableAnnotationComposer composer = $composerBuilder(
@@ -2524,8 +2281,7 @@ class $$FarmsTableTableManager extends RootTableManager<
     $$FarmsTableUpdateCompanionBuilder,
     (Farm, $$FarmsTableReferences),
     Farm,
-    PrefetchHooks Function(
-        {bool harvestsRefs, bool devicesRefs, bool readingsRefs})> {
+    PrefetchHooks Function({bool harvestsRefs, bool readingsRefs})> {
   $$FarmsTableTableManager(_$AppDatabase db, $FarmsTable table)
       : super(TableManagerState(
           db: db,
@@ -2539,7 +2295,9 @@ class $$FarmsTableTableManager extends RootTableManager<
           updateCompanionCallback: ({
             Value<String> id = const Value.absent(),
             Value<String> name = const Value.absent(),
-            Value<String> deviceId = const Value.absent(),
+            Value<String> thingSpeakChannelId = const Value.absent(),
+            Value<String> thingSpeakReadApiKey = const Value.absent(),
+            Value<String?> thingSpeakFieldMap = const Value.absent(),
             Value<String?> location = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -2555,7 +2313,9 @@ class $$FarmsTableTableManager extends RootTableManager<
               FarmsCompanion(
             id: id,
             name: name,
-            deviceId: deviceId,
+            thingSpeakChannelId: thingSpeakChannelId,
+            thingSpeakReadApiKey: thingSpeakReadApiKey,
+            thingSpeakFieldMap: thingSpeakFieldMap,
             location: location,
             notes: notes,
             createdAt: createdAt,
@@ -2571,7 +2331,9 @@ class $$FarmsTableTableManager extends RootTableManager<
           createCompanionCallback: ({
             required String id,
             required String name,
-            required String deviceId,
+            required String thingSpeakChannelId,
+            required String thingSpeakReadApiKey,
+            Value<String?> thingSpeakFieldMap = const Value.absent(),
             Value<String?> location = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             required DateTime createdAt,
@@ -2587,7 +2349,9 @@ class $$FarmsTableTableManager extends RootTableManager<
               FarmsCompanion.insert(
             id: id,
             name: name,
-            deviceId: deviceId,
+            thingSpeakChannelId: thingSpeakChannelId,
+            thingSpeakReadApiKey: thingSpeakReadApiKey,
+            thingSpeakFieldMap: thingSpeakFieldMap,
             location: location,
             notes: notes,
             createdAt: createdAt,
@@ -2605,14 +2369,11 @@ class $$FarmsTableTableManager extends RootTableManager<
                   (e.readTable(table), $$FarmsTableReferences(db, table, e)))
               .toList(),
           prefetchHooksCallback: (
-              {harvestsRefs = false,
-              devicesRefs = false,
-              readingsRefs = false}) {
+              {harvestsRefs = false, readingsRefs = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [
                 if (harvestsRefs) db.harvests,
-                if (devicesRefs) db.devices,
                 if (readingsRefs) db.readings
               ],
               addJoins: null,
@@ -2625,17 +2386,6 @@ class $$FarmsTableTableManager extends RootTableManager<
                             $$FarmsTableReferences._harvestsRefsTable(db),
                         managerFromTypedResult: (p0) =>
                             $$FarmsTableReferences(db, table, p0).harvestsRefs,
-                        referencedItemsForCurrentItem: (item,
-                                referencedItems) =>
-                            referencedItems.where((e) => e.farmId == item.id),
-                        typedResults: items),
-                  if (devicesRefs)
-                    await $_getPrefetchedData<Farm, $FarmsTable, Device>(
-                        currentTable: table,
-                        referencedTable:
-                            $$FarmsTableReferences._devicesRefsTable(db),
-                        managerFromTypedResult: (p0) =>
-                            $$FarmsTableReferences(db, table, p0).devicesRefs,
                         referencedItemsForCurrentItem: (item,
                                 referencedItems) =>
                             referencedItems.where((e) => e.farmId == item.id),
@@ -2669,8 +2419,7 @@ typedef $$FarmsTableProcessedTableManager = ProcessedTableManager<
     $$FarmsTableUpdateCompanionBuilder,
     (Farm, $$FarmsTableReferences),
     Farm,
-    PrefetchHooks Function(
-        {bool harvestsRefs, bool devicesRefs, bool readingsRefs})>;
+    PrefetchHooks Function({bool harvestsRefs, bool readingsRefs})>;
 typedef $$HarvestsTableCreateCompanionBuilder = HarvestsCompanion Function({
   required String id,
   required String farmId,
@@ -3030,276 +2779,6 @@ typedef $$HarvestsTableProcessedTableManager = ProcessedTableManager<
     $$HarvestsTableUpdateCompanionBuilder,
     (Harvest, $$HarvestsTableReferences),
     Harvest,
-    PrefetchHooks Function({bool farmId})>;
-typedef $$DevicesTableCreateCompanionBuilder = DevicesCompanion Function({
-  required String deviceId,
-  required String name,
-  required String address,
-  Value<String?> farmId,
-  required DateTime lastConnected,
-  Value<int> rowid,
-});
-typedef $$DevicesTableUpdateCompanionBuilder = DevicesCompanion Function({
-  Value<String> deviceId,
-  Value<String> name,
-  Value<String> address,
-  Value<String?> farmId,
-  Value<DateTime> lastConnected,
-  Value<int> rowid,
-});
-
-final class $$DevicesTableReferences
-    extends BaseReferences<_$AppDatabase, $DevicesTable, Device> {
-  $$DevicesTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static $FarmsTable _farmIdTable(_$AppDatabase db) => db.farms
-      .createAlias($_aliasNameGenerator(db.devices.farmId, db.farms.id));
-
-  $$FarmsTableProcessedTableManager? get farmId {
-    final $_column = $_itemColumn<String>('farm_id');
-    if ($_column == null) return null;
-    final manager = $$FarmsTableTableManager($_db, $_db.farms)
-        .filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_farmIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-        manager.$state.copyWith(prefetchedData: [item]));
-  }
-}
-
-class $$DevicesTableFilterComposer
-    extends Composer<_$AppDatabase, $DevicesTable> {
-  $$DevicesTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get deviceId => $composableBuilder(
-      column: $table.deviceId, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get name => $composableBuilder(
-      column: $table.name, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get address => $composableBuilder(
-      column: $table.address, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get lastConnected => $composableBuilder(
-      column: $table.lastConnected, builder: (column) => ColumnFilters(column));
-
-  $$FarmsTableFilterComposer get farmId {
-    final $$FarmsTableFilterComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.farmId,
-        referencedTable: $db.farms,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$FarmsTableFilterComposer(
-              $db: $db,
-              $table: $db.farms,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return composer;
-  }
-}
-
-class $$DevicesTableOrderingComposer
-    extends Composer<_$AppDatabase, $DevicesTable> {
-  $$DevicesTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get deviceId => $composableBuilder(
-      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get name => $composableBuilder(
-      column: $table.name, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get address => $composableBuilder(
-      column: $table.address, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get lastConnected => $composableBuilder(
-      column: $table.lastConnected,
-      builder: (column) => ColumnOrderings(column));
-
-  $$FarmsTableOrderingComposer get farmId {
-    final $$FarmsTableOrderingComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.farmId,
-        referencedTable: $db.farms,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$FarmsTableOrderingComposer(
-              $db: $db,
-              $table: $db.farms,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return composer;
-  }
-}
-
-class $$DevicesTableAnnotationComposer
-    extends Composer<_$AppDatabase, $DevicesTable> {
-  $$DevicesTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get deviceId =>
-      $composableBuilder(column: $table.deviceId, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<String> get address =>
-      $composableBuilder(column: $table.address, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get lastConnected => $composableBuilder(
-      column: $table.lastConnected, builder: (column) => column);
-
-  $$FarmsTableAnnotationComposer get farmId {
-    final $$FarmsTableAnnotationComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.farmId,
-        referencedTable: $db.farms,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$FarmsTableAnnotationComposer(
-              $db: $db,
-              $table: $db.farms,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return composer;
-  }
-}
-
-class $$DevicesTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $DevicesTable,
-    Device,
-    $$DevicesTableFilterComposer,
-    $$DevicesTableOrderingComposer,
-    $$DevicesTableAnnotationComposer,
-    $$DevicesTableCreateCompanionBuilder,
-    $$DevicesTableUpdateCompanionBuilder,
-    (Device, $$DevicesTableReferences),
-    Device,
-    PrefetchHooks Function({bool farmId})> {
-  $$DevicesTableTableManager(_$AppDatabase db, $DevicesTable table)
-      : super(TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$DevicesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$DevicesTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$DevicesTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback: ({
-            Value<String> deviceId = const Value.absent(),
-            Value<String> name = const Value.absent(),
-            Value<String> address = const Value.absent(),
-            Value<String?> farmId = const Value.absent(),
-            Value<DateTime> lastConnected = const Value.absent(),
-            Value<int> rowid = const Value.absent(),
-          }) =>
-              DevicesCompanion(
-            deviceId: deviceId,
-            name: name,
-            address: address,
-            farmId: farmId,
-            lastConnected: lastConnected,
-            rowid: rowid,
-          ),
-          createCompanionCallback: ({
-            required String deviceId,
-            required String name,
-            required String address,
-            Value<String?> farmId = const Value.absent(),
-            required DateTime lastConnected,
-            Value<int> rowid = const Value.absent(),
-          }) =>
-              DevicesCompanion.insert(
-            deviceId: deviceId,
-            name: name,
-            address: address,
-            farmId: farmId,
-            lastConnected: lastConnected,
-            rowid: rowid,
-          ),
-          withReferenceMapper: (p0) => p0
-              .map((e) =>
-                  (e.readTable(table), $$DevicesTableReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: ({farmId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins: <
-                  T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic>>(state) {
-                if (farmId) {
-                  state = state.withJoin(
-                    currentTable: table,
-                    currentColumn: table.farmId,
-                    referencedTable: $$DevicesTableReferences._farmIdTable(db),
-                    referencedColumn:
-                        $$DevicesTableReferences._farmIdTable(db).id,
-                  ) as T;
-                }
-
-                return state;
-              },
-              getPrefetchedDataCallback: (items) async {
-                return [];
-              },
-            );
-          },
-        ));
-}
-
-typedef $$DevicesTableProcessedTableManager = ProcessedTableManager<
-    _$AppDatabase,
-    $DevicesTable,
-    Device,
-    $$DevicesTableFilterComposer,
-    $$DevicesTableOrderingComposer,
-    $$DevicesTableAnnotationComposer,
-    $$DevicesTableCreateCompanionBuilder,
-    $$DevicesTableUpdateCompanionBuilder,
-    (Device, $$DevicesTableReferences),
-    Device,
     PrefetchHooks Function({bool farmId})>;
 typedef $$ReadingsTableCreateCompanionBuilder = ReadingsCompanion Function({
   Value<int> id,
@@ -3740,8 +3219,6 @@ class $AppDatabaseManager {
       $$FarmsTableTableManager(_db, _db.farms);
   $$HarvestsTableTableManager get harvests =>
       $$HarvestsTableTableManager(_db, _db.harvests);
-  $$DevicesTableTableManager get devices =>
-      $$DevicesTableTableManager(_db, _db.devices);
   $$ReadingsTableTableManager get readings =>
       $$ReadingsTableTableManager(_db, _db.readings);
   $$SettingsTableTableManager get settings =>

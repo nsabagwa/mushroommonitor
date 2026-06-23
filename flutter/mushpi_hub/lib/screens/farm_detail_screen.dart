@@ -27,19 +27,19 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
   @override
   void initState() {
     super.initState();
-    
+
     developer.log(
       '📱 [FarmDetailScreen] Initializing with farm ID: ${widget.farmId}',
       name: 'mushpi.screens.farm_detail',
     );
-    
+
     // Select this farm as current when screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       developer.log(
         '🎯 [FarmDetailScreen] Selecting farm: ${widget.farmId}',
         name: 'mushpi.screens.farm_detail',
       );
-      ref.read(currentFarmIdProvider.notifier).selectFarm(widget.farmId);
+      ref.read(currentFarmIdProvider.notifier).state = widget.farmId;
     });
   }
 
@@ -49,7 +49,7 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
       '🎨 [FarmDetailScreen] Building screen for farm: ${widget.farmId}',
       name: 'mushpi.screens.farm_detail',
     );
-    
+
     // Fetch farm directly by ID instead of using currentFarmProvider
     // This avoids timing issues with the currentFarmIdProvider
     final farmAsync = ref.watch(farmByIdProvider(widget.farmId));
@@ -146,10 +146,9 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
                           Text('Location: ${farm.location}'),
                         ],
                         const SizedBox(height: 8),
-                        Text('Device ID: ${farm.deviceId}'),
-                        const SizedBox(height: 4),
                         Text('Total Harvests: ${farm.totalHarvests}'),
-                        Text('Total Yield: ${farm.totalYieldKg.toStringAsFixed(1)} kg'),
+                        Text(
+                            'Total Yield: ${farm.totalYieldKg.toStringAsFixed(1)} kg'),
                         const SizedBox(height: 8),
                         Text(
                           'Created: ${_formatDate(farm.createdAt)}',
@@ -218,7 +217,10 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
             Icon(
               Icons.search_off,
               size: 120,
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurfaceVariant
+                  .withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(

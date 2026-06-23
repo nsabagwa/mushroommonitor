@@ -5,15 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/app_state_provider.dart';
-import '../providers/farms_provider.dart';
 
-/// Splash screen shown during app initialization.
-///
-/// Displays MushPi logo and loading indicator while:
-/// - Initializing database
-/// - Loading saved settings
-/// - Checking for saved farms
-/// - Preparing app state
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -31,7 +23,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   void initState() {
     super.initState();
 
-    // Setup animations
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -52,32 +43,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
 
     _controller.forward();
-
-    // Initialize app and navigate
     _initializeApp();
   }
 
   Future<void> _initializeApp() async {
     try {
-      // Watch app initialization
       await ref.read(appInitializationProvider.future);
-
-      // Wait minimum time for splash screen
       await Future.delayed(const Duration(seconds: 2));
 
-      // Check if we have any farms
-      final farms = await ref.read(allFarmsProvider.future);
-
       if (!mounted) return;
-
-      // Navigate to appropriate screen
-      if (farms.isEmpty) {
-        // No farms, go to farms tab (will show empty state)
-        context.go('/farms');
-      } else {
-        // Has farms, go to farms tab
-        context.go('/farms');
-      }
+      context.go('/login');
     } catch (e, stack) {
       developer.log(
         'Splash screen initialization error',
@@ -88,8 +63,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       );
 
       if (!mounted) return;
-
-      // Show error and navigate to home anyway
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Initialization error: ${e.toString()}'),
@@ -99,7 +72,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;
-      context.go('/farms');
+      context.go('/login');
     }
   }
 
@@ -121,15 +94,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
-
-              // Animated logo
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: ScaleTransition(
                   scale: _scaleAnimation,
                   child: Column(
                     children: [
-                      // Logo icon
                       Container(
                         width: 120,
                         height: 120,
@@ -138,7 +108,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: colorScheme.primary.withOpacity(0.3),
+                              color: colorScheme.primary.withValues(alpha: 0.3),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -150,21 +120,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           color: colorScheme.onPrimaryContainer,
                         ),
                       ),
-
                       const SizedBox(height: 24),
-
-                      // App name
                       Text(
                         'MushPi',
-                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                       ),
-
                       const SizedBox(height: 8),
-
-                      // Tagline
                       Text(
                         'Mushroom Cultivation Controller',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -175,10 +140,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   ),
                 ),
               ),
-
               const Spacer(),
-
-              // Loading indicator
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: Column(
@@ -201,7 +163,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   ],
                 ),
               ),
-
               const SizedBox(height: 48),
             ],
           ),

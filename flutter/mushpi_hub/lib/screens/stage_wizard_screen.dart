@@ -1,25 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:developer' as developer;
 
 import '../core/constants/ble_constants.dart';
-import '../core/utils/ble_serializer.dart';
 import '../providers/current_farm_provider.dart';
 import '../providers/farms_provider.dart';
-import '../providers/ble_provider.dart';
 import '../app.dart' show routeObserver;
 
 /// Stage Configuration Wizard
 ///
 /// Multi-step form that configures the complete grow cycle:
 /// - Step 0: Species, Date Planted, Automation Mode, Current Stage
-/// - Step 1: Incubation stage settings (expected days + thresholds)
-/// - Step 2: Pinning stage settings (expected days + thresholds)
-/// - Step 3: Fruiting stage settings (expected days + thresholds)
+/// - Step 1: Incubation stage settings
+/// - Step 2: Pinning stage settings
+/// - Step 3: Fruiting stage settings
 /// - Step 4: Review & Submit all settings
 ///
-/// Submits all three stage thresholds + current stage state atomically.
+/// BLE connectivity removed. Re-wire bleOps calls when BLE is restored.
 class StageWizardScreen extends ConsumerStatefulWidget {
   const StageWizardScreen({super.key});
 
@@ -29,7 +26,6 @@ class StageWizardScreen extends ConsumerStatefulWidget {
 
 class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     with RouteAware, WidgetsBindingObserver {
-  // Wizard state
   int _currentStep = 0;
   static const int _totalSteps = 5;
 
@@ -39,38 +35,29 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
   ControlMode _mode = ControlMode.semi;
   GrowthStage _currentStage = GrowthStage.incubation;
 
-  // Stage configurations - each stores {expectedDays, tempMin, tempMax, rhMin, co2Max, lightMode, lightOnMinutes, lightOffMinutes}
   final Map<GrowthStage, Map<String, dynamic>> _stageConfigs = {
     GrowthStage.incubation: {},
     GrowthStage.pinning: {},
     GrowthStage.fruiting: {},
   };
 
-  // Form controllers for current step
   final Map<GrowthStage, Map<String, TextEditingController>> _controllers = {
     GrowthStage.incubation: {},
     GrowthStage.pinning: {},
     GrowthStage.fruiting: {},
   };
 
-  // UI state
   bool _isLoading = false;
-  // Track unsaved changes (currently unused but kept for future unsaved changes indicator)
   // ignore: unused_field
   bool _hasChanges = false;
   String? _errorMessage;
   String? _successMessage;
-
-  // BLE connection subscription
-  ProviderSubscription<AsyncValue<BluetoothConnectionState>>?
-      _bleConnSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Initialize controllers for all stages
     for (var stage in GrowthStage.values) {
       _controllers[stage] = {
         'expectedDays': TextEditingController(),
@@ -83,31 +70,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       };
     }
 
-    // Set up BLE connection listener
-    _bleConnSubscription =
-        ref.listenManual<AsyncValue<BluetoothConnectionState>>(
-      bleConnectionStateProvider,
-      (prev, next) {
-        final prevState = prev?.valueOrNull;
-        final nextState = next.valueOrNull;
-        if (nextState == BluetoothConnectionState.connected &&
-            prevState != BluetoothConnectionState.connected) {
-          developer.log(
-            '🔄 Loading data due to BLE connection',
-            name: 'mushpi.stage_wizard',
-          );
-          _loadExistingData();
-        }
-      },
-    );
-
-    // Always load data on navigation to stage screen
-    // This ensures we always read the latest thresholds from the device
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      developer.log(
-        '🔄 Stage wizard opened - loading current thresholds from device',
-        name: 'mushpi.stage_wizard',
-      );
       _loadExistingData();
     });
   }
@@ -123,25 +86,18 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
 
   @override
   void didPopNext() {
-    developer.log(
-      '🔄 Refreshing data on navigation return',
-      name: 'mushpi.stage_wizard',
-    );
+    developer.log('Refreshing data on navigation return',
+        name: 'mushpi.stage_wizard');
     _loadExistingData();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      developer.log(
-        '🔄 Refreshing data on app resume',
-        name: 'mushpi.stage_wizard',
-      );
       _loadExistingData();
     }
   }
 
-  /// Load default values for all stages based on species
   void _loadDefaultValues() {
     final defaults = _getSpeciesDefaults(_species);
 
@@ -154,7 +110,6 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         final stageDefaults = defaults[stage]!;
         _stageConfigs[stage] = Map.from(stageDefaults);
 
-        // Update controllers
         _controllers[stage]!['expectedDays']!.text =
             stageDefaults['expectedDays'].toString();
         _controllers[stage]!['tempMin']!.text =
@@ -168,7 +123,6 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     });
   }
 
-  /// Load default values for a single stage
   void _loadDefaultValuesForStage(GrowthStage stage) {
     final defaults = _getSpeciesDefaults(_species);
     final stageDefaults = defaults[stage]!;
@@ -176,7 +130,6 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     setState(() {
       _stageConfigs[stage] = Map.from(stageDefaults);
 
-      // Update controllers
       _controllers[stage]!['expectedDays']!.text =
           stageDefaults['expectedDays'].toString();
       _controllers[stage]!['tempMin']!.text =
@@ -188,7 +141,6 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     });
   }
 
-  /// Load existing data from device
   Future<void> _loadExistingData() async {
     setState(() {
       _isLoading = true;
@@ -196,149 +148,17 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     });
 
     try {
-      // Check connection state first - use direct property instead of stream
-      final isConnected = ref.read(bleRepositoryProvider).isConnected;
-      if (!isConnected) {
-        developer.log(
-          '⚠️ Not connected to device - loading defaults',
-          name: 'mushpi.stage_wizard',
-        );
-        _loadDefaultValues();
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final bleOps = ref.read(bleOperationsProvider);
-
+      // BLE removed — load defaults only.
       developer.log(
-        '📖 Reading current thresholds from device...',
+        'BLE not available — loading species defaults',
         name: 'mushpi.stage_wizard',
       );
-
-      // Load current stage state
-      final stageState = await bleOps.readStageState();
-      if (stageState != null) {
-        developer.log(
-          '✅ Loaded stage state: ${stageState.species.displayName} - ${stageState.stage.displayName}',
-          name: 'mushpi.stage_wizard',
-        );
-        setState(() {
-          _species = stageState.species;
-          _mode = stageState.mode;
-          _currentStage = stageState.stage;
-          // Note: stageStartTime is when the CURRENT stage started, not planting date
-          // We'll calculate the actual planting date after loading all stage thresholds
-          _datePlanted = stageState.stageStartTime;
-        });
-      } else {
-        developer.log(
-          '⚠️ No stage state found on device',
-          name: 'mushpi.stage_wizard',
-        );
-      }
-
-      // Load thresholds for all three stages
-      for (var stage in [
-        GrowthStage.incubation,
-        GrowthStage.pinning,
-        GrowthStage.fruiting
-      ]) {
-        final thresholds = await bleOps.readStageThresholds(_species, stage);
-        if (thresholds != null) {
-          developer.log(
-            '✅ Loaded thresholds for ${stage.displayName} from device',
-            name: 'mushpi.stage_wizard',
-          );
-          setState(() {
-            _stageConfigs[stage] = {
-              'expectedDays': thresholds.expectedDays ??
-                  _getDefaultExpectedDays(_species, stage),
-              'tempMin': thresholds.tempMin,
-              'tempMax': thresholds.tempMax,
-              'rhMin': thresholds.rhMin,
-              'co2Max': thresholds.co2Max,
-              'lightMode': thresholds.lightMode,
-              'lightOnMinutes': thresholds.lightOnMinutes,
-              'lightOffMinutes': thresholds.lightOffMinutes,
-              'start_time': thresholds.startTime,
-            };
-
-            // Update controllers
-            _controllers[stage]!['tempMin']!.text =
-                thresholds.tempMin?.toString() ?? '';
-            _controllers[stage]!['tempMax']!.text =
-                thresholds.tempMax?.toString() ?? '';
-            _controllers[stage]!['rhMin']!.text =
-                thresholds.rhMin?.toString() ?? '';
-            _controllers[stage]!['co2Max']!.text =
-                thresholds.co2Max?.toString() ?? '';
-
-            // Convert minutes to HH:MM
-            if (thresholds.lightOnMinutes != null) {
-              final hours = thresholds.lightOnMinutes! ~/ 60;
-              final mins = thresholds.lightOnMinutes! % 60;
-              _controllers[stage]!['lightOnTime']!.text =
-                  '${hours.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}';
-            }
-            if (thresholds.lightOffMinutes != null) {
-              final hours = thresholds.lightOffMinutes! ~/ 60;
-              final mins = thresholds.lightOffMinutes! % 60;
-              _controllers[stage]!['lightOffTime']!.text =
-                  '${hours.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}';
-            }
-          });
-        } else {
-          // BLE read returned null - load defaults for this stage
-          developer.log(
-            '⚠️ No thresholds found for ${stage.displayName}, loading defaults',
-            name: 'mushpi.stage_wizard',
-          );
-          _loadDefaultValuesForStage(stage);
-        }
-      }
-
-      // Set planting date from Incubation stage's start_time (if available)
-      if (_stageConfigs[GrowthStage.incubation]?['start_time'] != null) {
-        try {
-          final incubationStartTime = DateTime.parse(
-            _stageConfigs[GrowthStage.incubation]!['start_time'] as String,
-          );
-          setState(() {
-            _datePlanted = incubationStartTime;
-          });
-          developer.log(
-            '🌱 Planting date loaded from Incubation start_time: $_datePlanted',
-            name: 'mushpi.stage_wizard',
-          );
-        } catch (e) {
-          developer.log(
-            '⚠️ Could not parse Incubation start_time: $e',
-            name: 'mushpi.stage_wizard',
-          );
-        }
-      } else {
-        developer.log(
-          '⚠️ No start_time found in Incubation thresholds, using current stage start',
-          name: 'mushpi.stage_wizard',
-        );
-      }
-
-      developer.log(
-        '✅ Successfully loaded configuration from device',
-        name: 'mushpi.stage_wizard',
-      );
+      _loadDefaultValues();
     } catch (e) {
-      developer.log(
-        '❌ Failed to load data from device: $e',
-        name: 'mushpi.stage_wizard',
-        error: e,
-      );
+      developer.log('Failed to load data: $e', name: 'mushpi.stage_wizard');
       setState(() {
-        _errorMessage = 'Could not read from device. Using defaults.';
+        _errorMessage = 'Could not load data. Using defaults.';
       });
-      // Load defaults on error
       _loadDefaultValues();
     } finally {
       setState(() {
@@ -347,9 +167,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     }
   }
 
-  /// Submit all settings
   Future<void> _submitAllSettings() async {
-    // Validate all stages
     final validationError = _validateAllStages();
     if (validationError != null) {
       setState(() {
@@ -365,77 +183,28 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     });
 
     try {
-      final bleOps = ref.read(bleOperationsProvider);
-
-      // 1. Write stage state
-      final stageState = StageStateData(
-        mode: _mode,
-        species: _species,
-        stage: _currentStage,
-        stageStartTime: _datePlanted,
-        expectedDays: _stageConfigs[_currentStage]!['expectedDays'] as int,
-      );
-      await bleOps.writeStageState(stageState);
-
-      // 2. Write thresholds for all three stages
-      for (var stage in [
-        GrowthStage.incubation,
-        GrowthStage.pinning,
-        GrowthStage.fruiting
-      ]) {
-        final config = _stageConfigs[stage]!;
-
-        // Parse light timing
-        int? lightOnMinutes;
-        int? lightOffMinutes;
-        final lightMode = config['lightMode'] as LightMode;
-        if (lightMode == LightMode.cycle) {
-          final onParts = _controllers[stage]!['lightOnTime']!.text.split(':');
-          final offParts =
-              _controllers[stage]!['lightOffTime']!.text.split(':');
-          if (onParts.length == 2 && offParts.length == 2) {
-            lightOnMinutes =
-                (int.parse(onParts[0]) * 60) + int.parse(onParts[1]);
-            lightOffMinutes =
-                (int.parse(offParts[0]) * 60) + int.parse(offParts[1]);
-          }
-        }
-
-        final thresholds = StageThresholdsData(
-          species: _species,
-          stage: stage,
-          tempMin: config['tempMin'] as double?,
-          tempMax: config['tempMax'] as double?,
-          rhMin: config['rhMin'] as double?,
-          co2Max: config['co2Max'] as int?,
-          lightMode: lightMode,
-          lightOnMinutes: lightOnMinutes,
-          lightOffMinutes: lightOffMinutes,
-          expectedDays: config['expectedDays'] as int?,
-          startTime: config['start_time'] as String?,
-        );
-
-        await bleOps.writeStageThresholds(thresholds);
-
-        developer.log(
-          '✅ Wrote thresholds for ${stage.displayName}',
-          name: 'mushpi.stage_wizard',
-        );
-      }
-
+      // BLE removed — settings cannot be written to device yet.
+      // TODO: re-wire bleOps.writeStageState / writeStageThresholds when BLE restored.
       developer.log(
-        '✅ All settings submitted successfully',
+        'BLE not available — settings saved locally only',
         name: 'mushpi.stage_wizard',
       );
 
-      // Show success message and return to first page
+      final selectedFarmId = ref.read(selectedMonitoringFarmIdProvider);
+      if (selectedFarmId != null) {
+        await ref.read(alertSyncRepositoryProvider).syncThresholds(
+              farmId: selectedFarmId,
+              stageConfigs: _stageConfigs,
+              currentStage: _currentStage,
+            );
+      }
+
       setState(() {
         _hasChanges = false;
-        _successMessage = 'All settings applied successfully!';
-        _currentStep = 0; // Return to page one
+        _successMessage = 'Settings saved (device not connected, alerts synced)';
+        _currentStep = 0;
       });
 
-      // Clear success message after a few seconds
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           setState(() {
@@ -447,11 +216,6 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       setState(() {
         _errorMessage = 'Failed to save settings: $e';
       });
-      developer.log(
-        '❌ Failed to save settings: $e',
-        name: 'mushpi.stage_wizard',
-        error: e,
-      );
     } finally {
       setState(() {
         _isLoading = false;
@@ -459,14 +223,11 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     }
   }
 
-  /// Validate all stage configurations
   String? _validateAllStages() {
-    // Validate basic info
     if (_datePlanted.isAfter(DateTime.now())) {
       return 'Date planted cannot be in the future';
     }
 
-    // Validate each stage
     for (var stage in [
       GrowthStage.incubation,
       GrowthStage.pinning,
@@ -481,18 +242,15 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     return null;
   }
 
-  /// Validate a single stage configuration
   String? _validateStageConfig(GrowthStage stage) {
     final config = _stageConfigs[stage]!;
     final controllers = _controllers[stage]!;
 
-    // Expected days
     final expectedDays = int.tryParse(controllers['expectedDays']!.text);
     if (expectedDays == null || expectedDays < 1 || expectedDays > 365) {
       return 'Expected days must be between 1 and 365';
     }
 
-    // Temperature
     final tempMin = double.tryParse(controllers['tempMin']!.text);
     final tempMax = double.tryParse(controllers['tempMax']!.text);
     if (tempMin == null || tempMax == null) {
@@ -505,19 +263,16 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       return 'Temperature minimum must be less than maximum';
     }
 
-    // Humidity
     final rhMin = double.tryParse(controllers['rhMin']!.text);
     if (rhMin != null && (rhMin < 40 || rhMin > 100)) {
       return 'Humidity must be between 40% and 100%';
     }
 
-    // CO2
     final co2Max = int.tryParse(controllers['co2Max']!.text);
     if (co2Max != null && (co2Max < 400 || co2Max > 5000)) {
       return 'CO₂ must be between 400 ppm and 5000 ppm';
     }
 
-    // Light timing (if CYCLE mode)
     final lightMode = config['lightMode'] as LightMode;
     if (lightMode == LightMode.cycle) {
       final onParts = controllers['lightOnTime']!.text.split(':');
@@ -547,7 +302,6 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       }
     }
 
-    // Update config from controllers
     _stageConfigs[stage] = {
       'expectedDays': expectedDays,
       'tempMin': tempMin,
@@ -586,19 +340,14 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
   @override
   Widget build(BuildContext context) {
     final selectedFarmId = ref.watch(selectedMonitoringFarmIdProvider);
-    final isConnected = ref.watch(bleRepositoryProvider).isConnected;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Stage Configuration'),
-        // Note: No leading close button because this is a tab screen, not a pushed route.
-        // Users navigate away using the bottom navigation tabs.
-        // Showing a close button that calls Navigator.pop() would cause
-        // "popped last page off stack" error since there's no route to pop.
       ),
       body: selectedFarmId == null
           ? _buildFarmSelector()
-          : _buildWizard(isConnected),
+          : _buildWizard(false), // isConnected = false until BLE restored
     );
   }
 
@@ -618,18 +367,14 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
                   color: Theme.of(context)
                       .colorScheme
                       .onSurfaceVariant
-                      .withOpacity(0.5),
+                      .withValues(alpha: 0.5),
                 ),
                 const SizedBox(height: 24),
-                Text(
-                  'No Farms Available',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
+                Text('No Farms Available',
+                    style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 12),
-                Text(
-                  'Add a farm to configure stages',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
+                Text('Add a farm to configure stages',
+                    style: Theme.of(context).textTheme.bodyLarge),
               ],
             ),
           );
@@ -664,31 +409,23 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(
-        child: Text('Error loading farms: $error'),
-      ),
+      error: (error, _) => Center(child: Text('Error loading farms: $error')),
     );
   }
 
   Widget _buildWizard(bool isConnected) {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     return Column(
       children: [
-        // Stepper indicator
         _buildStepIndicator(),
-
-        // Content
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Error/Success messages
                 if (_errorMessage != null) ...[
                   Card(
                     color: Theme.of(context).colorScheme.errorContainer,
@@ -696,20 +433,18 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.error,
-                            color:
-                                Theme.of(context).colorScheme.onErrorContainer,
-                          ),
+                          Icon(Icons.error,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onErrorContainer),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               _errorMessage!,
                               style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onErrorContainer,
-                              ),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onErrorContainer),
                             ),
                           ),
                         ],
@@ -718,7 +453,6 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
                   ),
                   const SizedBox(height: 16),
                 ],
-
                 if (_successMessage != null) ...[
                   Card(
                     color: Theme.of(context).colorScheme.primaryContainer,
@@ -726,21 +460,18 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
-                          ),
+                          Icon(Icons.check_circle,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onPrimaryContainer),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               _successMessage!,
                               style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
-                              ),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer),
                             ),
                           ),
                         ],
@@ -749,15 +480,11 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
                   ),
                   const SizedBox(height: 16),
                 ],
-
-                // Step content
                 _buildStepContent(),
               ],
             ),
           ),
         ),
-
-        // Navigation buttons
         _buildNavigationButtons(isConnected),
       ],
     );
@@ -770,7 +497,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -828,10 +555,8 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Basic Information',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
+        Text('Basic Information',
+            style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
         Text(
           'Configure the basic details for your grow cycle',
@@ -840,49 +565,35 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
               ),
         ),
         const SizedBox(height: 24),
-
-        // Species Selection
-        Text(
-          'Species',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Species', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
         SegmentedButton<Species>(
           segments: const [
             ButtonSegment(
-              value: Species.oyster,
-              label: Text('Oyster'),
-              icon: Icon(Icons.eco),
-            ),
+                value: Species.oyster,
+                label: Text('Oyster'),
+                icon: Icon(Icons.eco)),
             ButtonSegment(
-              value: Species.shiitake,
-              label: Text('Shiitake'),
-              icon: Icon(Icons.eco),
-            ),
+                value: Species.shiitake,
+                label: Text('Shiitake'),
+                icon: Icon(Icons.eco)),
             ButtonSegment(
-              value: Species.lionsMane,
-              label: Text("Lion's Mane"),
-              icon: Icon(Icons.eco),
-            ),
+                value: Species.lionsMane,
+                label: Text("Lion's Mane"),
+                icon: Icon(Icons.eco)),
           ],
           selected: {_species},
           onSelectionChanged: (Set<Species> selection) {
             setState(() {
               _species = selection.first;
               _hasChanges = true;
-              _loadDefaultValues(); // Reload defaults for new species
+              _loadDefaultValues();
             });
           },
           showSelectedIcon: true,
         ),
-
         const SizedBox(height: 24),
-
-        // Date Planted
-        Text(
-          'Date Planted',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Date Planted', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
         Card(
           child: ListTile(
@@ -893,14 +604,9 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             onTap: _pickDatePlanted,
           ),
         ),
-
         const SizedBox(height: 24),
-
-        // Current Stage
-        Text(
-          'Current Growth Stage',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Current Growth Stage',
+            style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Text(
           'Which stage is your grow currently in?',
@@ -912,17 +618,9 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         SegmentedButton<GrowthStage>(
           segments: const [
             ButtonSegment(
-              value: GrowthStage.incubation,
-              label: Text('Incubation'),
-            ),
-            ButtonSegment(
-              value: GrowthStage.pinning,
-              label: Text('Pinning'),
-            ),
-            ButtonSegment(
-              value: GrowthStage.fruiting,
-              label: Text('Fruiting'),
-            ),
+                value: GrowthStage.incubation, label: Text('Incubation')),
+            ButtonSegment(value: GrowthStage.pinning, label: Text('Pinning')),
+            ButtonSegment(value: GrowthStage.fruiting, label: Text('Fruiting')),
           ],
           selected: {_currentStage},
           onSelectionChanged: (Set<GrowthStage> selection) {
@@ -932,14 +630,8 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             });
           },
         ),
-
         const SizedBox(height: 24),
-
-        // Automation Mode
-        Text(
-          'Automation Mode',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Automation Mode', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
         RadioListTile<ControlMode>(
           title: const Text('Full Auto'),
@@ -948,12 +640,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
           value: ControlMode.full,
           groupValue: _mode,
           onChanged: (value) {
-            if (value != null) {
-              setState(() {
-                _mode = value;
-                _hasChanges = true;
-              });
-            }
+            if (value != null) setState(() => _mode = value);
           },
         ),
         RadioListTile<ControlMode>(
@@ -962,12 +649,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
           value: ControlMode.semi,
           groupValue: _mode,
           onChanged: (value) {
-            if (value != null) {
-              setState(() {
-                _mode = value;
-                _hasChanges = true;
-              });
-            }
+            if (value != null) setState(() => _mode = value);
           },
         ),
         RadioListTile<ControlMode>(
@@ -976,12 +658,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
           value: ControlMode.manual,
           groupValue: _mode,
           onChanged: (value) {
-            if (value != null) {
-              setState(() {
-                _mode = value;
-                _hasChanges = true;
-              });
-            }
+            if (value != null) setState(() => _mode = value);
           },
         ),
       ],
@@ -996,10 +673,8 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '${stage.displayName} Stage',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
+        Text('${stage.displayName} Stage',
+            style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
         Text(
           _getStageDescription(stage),
@@ -1008,8 +683,6 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
               ),
         ),
         const SizedBox(height: 24),
-
-        // Stage Start Date (optional)
         Card(
           child: ListTile(
             leading: const Icon(Icons.event),
@@ -1018,38 +691,28 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
                   ? _formatDate(_getStageStartDate(stage)!)
                   : 'Not set (will use current time when stage starts)',
             ),
-            subtitle: Text(
-              stage == GrowthStage.incubation
-                  ? 'When was this batch started?'
-                  : 'When did this stage begin?',
-            ),
+            subtitle: Text(stage == GrowthStage.incubation
+                ? 'When was this batch started?'
+                : 'When did this stage begin?'),
             trailing: const Icon(Icons.edit),
             onTap: () => _pickStageStartDate(stage),
           ),
         ),
-
         const SizedBox(height: 24),
-
-        // Expected Duration
         TextField(
           controller: controllers['expectedDays'],
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             labelText: 'Expected Duration (days)',
-            border: const OutlineInputBorder(),
+            border: OutlineInputBorder(),
             helperText: 'How long does this stage typically last?',
-            prefixIcon: const Icon(Icons.schedule),
+            prefixIcon: Icon(Icons.schedule),
           ),
           keyboardType: TextInputType.number,
           onChanged: (_) => setState(() => _hasChanges = true),
         ),
-
         const SizedBox(height: 24),
-
-        // Temperature Range
-        Text(
-          'Temperature Range (°C)',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Temperature Range (°C)',
+            style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -1057,10 +720,9 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
               child: TextField(
                 controller: controllers['tempMin'],
                 decoration: const InputDecoration(
-                  labelText: 'Minimum',
-                  border: OutlineInputBorder(),
-                  helperText: '5-35°C',
-                ),
+                    labelText: 'Minimum',
+                    border: OutlineInputBorder(),
+                    helperText: '5-35°C'),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 onChanged: (_) => setState(() => _hasChanges = true),
@@ -1071,10 +733,9 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
               child: TextField(
                 controller: controllers['tempMax'],
                 decoration: const InputDecoration(
-                  labelText: 'Maximum',
-                  border: OutlineInputBorder(),
-                  helperText: '5-35°C',
-                ),
+                    labelText: 'Maximum',
+                    border: OutlineInputBorder(),
+                    helperText: '5-35°C'),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 onChanged: (_) => setState(() => _hasChanges = true),
@@ -1082,10 +743,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             ),
           ],
         ),
-
         const SizedBox(height: 24),
-
-        // Humidity Minimum
         TextField(
           controller: controllers['rhMin'],
           decoration: const InputDecoration(
@@ -1097,10 +755,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           onChanged: (_) => setState(() => _hasChanges = true),
         ),
-
         const SizedBox(height: 24),
-
-        // CO₂ Maximum
         TextField(
           controller: controllers['co2Max'],
           decoration: const InputDecoration(
@@ -1112,32 +767,23 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
           keyboardType: TextInputType.number,
           onChanged: (_) => setState(() => _hasChanges = true),
         ),
-
         const SizedBox(height: 24),
-
-        // Light Mode
-        Text(
-          'Light Mode',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Light Mode', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
         SegmentedButton<LightMode>(
           segments: const [
             ButtonSegment(
-              value: LightMode.off,
-              label: Text('OFF'),
-              icon: Icon(Icons.light_mode_outlined),
-            ),
+                value: LightMode.off,
+                label: Text('OFF'),
+                icon: Icon(Icons.light_mode_outlined)),
             ButtonSegment(
-              value: LightMode.on,
-              label: Text('ON'),
-              icon: Icon(Icons.light_mode),
-            ),
+                value: LightMode.on,
+                label: Text('ON'),
+                icon: Icon(Icons.light_mode)),
             ButtonSegment(
-              value: LightMode.cycle,
-              label: Text('CYCLE'),
-              icon: Icon(Icons.schedule),
-            ),
+                value: LightMode.cycle,
+                label: Text('CYCLE'),
+                icon: Icon(Icons.schedule)),
           ],
           selected: {lightMode},
           onSelectionChanged: (Set<LightMode> selection) {
@@ -1147,14 +793,10 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             });
           },
         ),
-
-        // Light timing (only for CYCLE mode)
         if (lightMode == LightMode.cycle) ...[
           const SizedBox(height: 24),
-          Text(
-            'Light Timing (24-hour format)',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text('Light Timing (24-hour format)',
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -1162,10 +804,9 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
                 child: TextField(
                   controller: controllers['lightOnTime'],
                   decoration: const InputDecoration(
-                    labelText: 'On Time (HH:MM)',
-                    border: OutlineInputBorder(),
-                    helperText: 'e.g. 08:00',
-                  ),
+                      labelText: 'On Time (HH:MM)',
+                      border: OutlineInputBorder(),
+                      helperText: 'e.g. 08:00'),
                   keyboardType: TextInputType.datetime,
                   onChanged: (_) => setState(() => _hasChanges = true),
                 ),
@@ -1175,10 +816,9 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
                 child: TextField(
                   controller: controllers['lightOffTime'],
                   decoration: const InputDecoration(
-                    labelText: 'Off Time (HH:MM)',
-                    border: OutlineInputBorder(),
-                    helperText: 'e.g. 20:00',
-                  ),
+                      labelText: 'Off Time (HH:MM)',
+                      border: OutlineInputBorder(),
+                      helperText: 'e.g. 20:00'),
                   keyboardType: TextInputType.datetime,
                   onChanged: (_) => setState(() => _hasChanges = true),
                 ),
@@ -1194,10 +834,8 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Review & Confirm',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
+        Text('Review & Confirm',
+            style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
         Text(
           'Please review all settings before submitting',
@@ -1206,36 +844,21 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
               ),
         ),
         const SizedBox(height: 24),
-
-        // Basic Info
-        _buildReviewSection(
-          'Basic Information',
-          Icons.info_outline,
-          [
-            _buildReviewItem(
-                'Species', _species.displayName, () => _jumpToStep(0)),
-            _buildReviewItem('Date Planted', _formatDate(_datePlanted),
-                () => _jumpToStep(0)),
-            _buildReviewItem('Current Stage', _currentStage.displayName,
-                () => _jumpToStep(0)),
-            _buildReviewItem(
-                'Automation Mode', _mode.displayName, () => _jumpToStep(0)),
-          ],
-        ),
-
+        _buildReviewSection('Basic Information', Icons.info_outline, [
+          _buildReviewItem(
+              'Species', _species.displayName, () => _jumpToStep(0)),
+          _buildReviewItem(
+              'Date Planted', _formatDate(_datePlanted), () => _jumpToStep(0)),
+          _buildReviewItem(
+              'Current Stage', _currentStage.displayName, () => _jumpToStep(0)),
+          _buildReviewItem(
+              'Automation Mode', _mode.displayName, () => _jumpToStep(0)),
+        ]),
         const SizedBox(height: 16),
-
-        // Incubation
         _buildReviewStageSection(GrowthStage.incubation, 1),
-
         const SizedBox(height: 16),
-
-        // Pinning
         _buildReviewStageSection(GrowthStage.pinning, 2),
-
         const SizedBox(height: 16),
-
-        // Fruiting
         _buildReviewStageSection(GrowthStage.fruiting, 3),
       ],
     );
@@ -1248,16 +871,11 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(icon, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
+            Row(children: [
+              Icon(icon, size: 20),
+              const SizedBox(width: 8),
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+            ]),
             const SizedBox(height: 16),
             ...items,
           ],
@@ -1277,43 +895,24 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
           ' (${controllers['lightOnTime']!.text} - ${controllers['lightOffTime']!.text})';
     }
 
-    return _buildReviewSection(
-      '${stage.displayName} Stage',
-      Icons.timeline,
-      [
-        if (_getStageStartDate(stage) != null)
-          _buildReviewItem(
-            'Start Date',
-            _formatDate(_getStageStartDate(stage)!),
-            () => _jumpToStep(stepIndex),
-          ),
-        _buildReviewItem(
+    return _buildReviewSection('${stage.displayName} Stage', Icons.timeline, [
+      if (_getStageStartDate(stage) != null)
+        _buildReviewItem('Start Date', _formatDate(_getStageStartDate(stage)!),
+            () => _jumpToStep(stepIndex)),
+      _buildReviewItem(
           'Expected Duration',
           '${controllers['expectedDays']!.text} days',
-          () => _jumpToStep(stepIndex),
-        ),
-        _buildReviewItem(
+          () => _jumpToStep(stepIndex)),
+      _buildReviewItem(
           'Temperature',
           '${controllers['tempMin']!.text}°C - ${controllers['tempMax']!.text}°C',
-          () => _jumpToStep(stepIndex),
-        ),
-        _buildReviewItem(
-          'Humidity Min',
-          '${controllers['rhMin']!.text}%',
-          () => _jumpToStep(stepIndex),
-        ),
-        _buildReviewItem(
-          'CO₂ Max',
-          '${controllers['co2Max']!.text} ppm',
-          () => _jumpToStep(stepIndex),
-        ),
-        _buildReviewItem(
-          'Light',
-          lightInfo,
-          () => _jumpToStep(stepIndex),
-        ),
-      ],
-    );
+          () => _jumpToStep(stepIndex)),
+      _buildReviewItem('Humidity Min', '${controllers['rhMin']!.text}%',
+          () => _jumpToStep(stepIndex)),
+      _buildReviewItem('CO₂ Max', '${controllers['co2Max']!.text} ppm',
+          () => _jumpToStep(stepIndex)),
+      _buildReviewItem('Light', lightInfo, () => _jumpToStep(stepIndex)),
+    ]);
   }
 
   Widget _buildReviewItem(String label, String value, VoidCallback onEdit) {
@@ -1326,17 +925,12 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
+                Text(label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        )),
                 const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+                Text(value, style: Theme.of(context).textTheme.bodyMedium),
               ],
             ),
           ),
@@ -1357,7 +951,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
@@ -1378,7 +972,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             Expanded(
               flex: 2,
               child: FilledButton.icon(
-                onPressed: _isLoading || !isConnected
+                onPressed: _isLoading
                     ? null
                     : (_currentStep == _totalSteps - 1
                         ? _submitAllSettings
@@ -1410,12 +1004,10 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
   Future<void> _pickDatePlanted() async {
     final now = DateTime.now();
     final firstDate = now.subtract(const Duration(days: 365));
-    final lastDate = now;
 
-    // Ensure initialDate is within valid range
     DateTime initialDate = _datePlanted;
-    if (initialDate.isBefore(firstDate) || initialDate.isAfter(lastDate)) {
-      initialDate = now; // Default to now if out of range
+    if (initialDate.isBefore(firstDate) || initialDate.isAfter(now)) {
+      initialDate = now;
     }
 
     if (!mounted) return;
@@ -1424,7 +1016,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       context: context,
       initialDate: initialDate,
       firstDate: firstDate,
-      lastDate: lastDate,
+      lastDate: now,
     );
 
     if (date == null || !mounted) return;
@@ -1438,14 +1030,8 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
 
     setState(() {
       _datePlanted = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        timeOfDay.hour,
-        timeOfDay.minute,
-      );
+          date.year, date.month, date.day, timeOfDay.hour, timeOfDay.minute);
 
-      // Store the planting date as the start_time for Incubation stage
       if (_stageConfigs.containsKey(GrowthStage.incubation)) {
         _stageConfigs[GrowthStage.incubation]!['start_time'] =
             _datePlanted.toIso8601String();
@@ -1455,29 +1041,22 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     });
   }
 
-  /// Get stage start date from config, or null if not set
   DateTime? _getStageStartDate(GrowthStage stage) {
     final startTimeStr = _stageConfigs[stage]?['start_time'] as String?;
     if (startTimeStr != null) {
       try {
         return DateTime.parse(startTimeStr);
-      } catch (e) {
-        developer.log('Failed to parse start_time: $e',
-            name: 'mushpi.stage_wizard');
-      }
+      } catch (_) {}
     }
     return null;
   }
 
-  /// Pick start date for a specific stage
   Future<void> _pickStageStartDate(GrowthStage stage) async {
     final now = DateTime.now();
     final firstDate = now.subtract(const Duration(days: 365));
-    final lastDate = now;
 
-    // Get current date or default to now
     DateTime initialDate = _getStageStartDate(stage) ?? now;
-    if (initialDate.isBefore(firstDate) || initialDate.isAfter(lastDate)) {
+    if (initialDate.isBefore(firstDate) || initialDate.isAfter(now)) {
       initialDate = now;
     }
 
@@ -1487,7 +1066,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       context: context,
       initialDate: initialDate,
       firstDate: firstDate,
-      lastDate: lastDate,
+      lastDate: now,
     );
 
     if (date == null || !mounted) return;
@@ -1501,12 +1080,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
 
     setState(() {
       final selectedDate = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        timeOfDay.hour,
-        timeOfDay.minute,
-      );
+          date.year, date.month, date.day, timeOfDay.hour, timeOfDay.minute);
       _stageConfigs[stage]!['start_time'] = selectedDate.toIso8601String();
       _hasChanges = true;
     });
@@ -1536,7 +1110,6 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     }
   }
 
-  /// Get default expected days for a species and stage
   int _getDefaultExpectedDays(Species species, GrowthStage stage) {
     switch (species) {
       case Species.oyster:
@@ -1571,7 +1144,6 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
     }
   }
 
-  /// Get default configurations for all stages based on species
   Map<GrowthStage, Map<String, dynamic>> _getSpeciesDefaults(Species species) {
     switch (species) {
       case Species.oyster:
@@ -1582,7 +1154,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 24.0,
             'rhMin': 90.0,
             'co2Max': 2000,
-            'lightMode': LightMode.off,
+            'lightMode': LightMode.off
           },
           GrowthStage.pinning: {
             'expectedDays': 5,
@@ -1590,7 +1162,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 22.0,
             'rhMin': 95.0,
             'co2Max': 1000,
-            'lightMode': LightMode.cycle,
+            'lightMode': LightMode.cycle
           },
           GrowthStage.fruiting: {
             'expectedDays': 7,
@@ -1598,7 +1170,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 20.0,
             'rhMin': 90.0,
             'co2Max': 800,
-            'lightMode': LightMode.cycle,
+            'lightMode': LightMode.cycle
           },
         };
       case Species.shiitake:
@@ -1609,7 +1181,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 22.0,
             'rhMin': 85.0,
             'co2Max': 2500,
-            'lightMode': LightMode.off,
+            'lightMode': LightMode.off
           },
           GrowthStage.pinning: {
             'expectedDays': 7,
@@ -1617,7 +1189,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 20.0,
             'rhMin': 90.0,
             'co2Max': 1000,
-            'lightMode': LightMode.cycle,
+            'lightMode': LightMode.cycle
           },
           GrowthStage.fruiting: {
             'expectedDays': 10,
@@ -1625,7 +1197,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 18.0,
             'rhMin': 85.0,
             'co2Max': 800,
-            'lightMode': LightMode.cycle,
+            'lightMode': LightMode.cycle
           },
         };
       case Species.lionsMane:
@@ -1636,7 +1208,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 24.0,
             'rhMin': 85.0,
             'co2Max': 2000,
-            'lightMode': LightMode.off,
+            'lightMode': LightMode.off
           },
           GrowthStage.pinning: {
             'expectedDays': 6,
@@ -1644,7 +1216,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 22.0,
             'rhMin': 90.0,
             'co2Max': 1000,
-            'lightMode': LightMode.cycle,
+            'lightMode': LightMode.cycle
           },
           GrowthStage.fruiting: {
             'expectedDays': 8,
@@ -1652,7 +1224,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 20.0,
             'rhMin': 85.0,
             'co2Max': 800,
-            'lightMode': LightMode.cycle,
+            'lightMode': LightMode.cycle
           },
         };
       case Species.custom:
@@ -1663,7 +1235,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 24.0,
             'rhMin': 90.0,
             'co2Max': 2000,
-            'lightMode': LightMode.off,
+            'lightMode': LightMode.off
           },
           GrowthStage.pinning: {
             'expectedDays': 5,
@@ -1671,7 +1243,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 22.0,
             'rhMin': 95.0,
             'co2Max': 1000,
-            'lightMode': LightMode.cycle,
+            'lightMode': LightMode.cycle
           },
           GrowthStage.fruiting: {
             'expectedDays': 7,
@@ -1679,7 +1251,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             'tempMax': 20.0,
             'rhMin': 90.0,
             'co2Max': 800,
-            'lightMode': LightMode.cycle,
+            'lightMode': LightMode.cycle
           },
         };
     }
@@ -1691,11 +1263,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       routeObserver.unsubscribe(this);
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}
-    try {
-      _bleConnSubscription?.close();
-    } catch (_) {}
 
-    // Dispose all controllers
     for (var stageControllers in _controllers.values) {
       for (var controller in stageControllers.values) {
         controller.dispose();

@@ -10,17 +10,20 @@ class Farm with _$Farm {
   const factory Farm({
     required String id, // Unique farm ID (UUID)
     required String name, // User-defined name
-    required String deviceId, // Linked MushPi device ID (one-to-one)
-    String? location, // Optional location
-    String? notes, // Farm notes/description
-    required DateTime createdAt, // Farm creation date
-    DateTime? lastActive, // Last time device connected
-    @Default(0) int totalHarvests, // Total number of harvests
-    @Default(0.0) double totalYieldKg, // Total yield in kilograms
-    Species? primarySpecies, // Primary mushroom species grown
-    String? imageUrl, // Farm photo (local path)
-    @Default(true) bool isActive, // Farm status (active/archived)
-    Map<String, dynamic>? metadata, // Additional metadata
+    required String thingSpeakChannelId, // ThingSpeak channel ID
+    required String thingSpeakReadApiKey, // ThingSpeak read API key
+    Map<String, String>?
+        thingSpeakFieldMap, // e.g. {"temperature":"field1","humidity":"field2","co2":"field3","light":"field4"}
+    String? location,
+    String? notes,
+    required DateTime createdAt,
+    DateTime? lastActive, // Last successful ThingSpeak fetch
+    @Default(0) int totalHarvests,
+    @Default(0.0) double totalYieldKg,
+    Species? primarySpecies,
+    String? imageUrl,
+    @Default(true) bool isActive,
+    Map<String, dynamic>? metadata,
   }) = _Farm;
 
   factory Farm.fromJson(Map<String, dynamic> json) => _$FarmFromJson(json);
@@ -32,34 +35,24 @@ class FarmAnalytics with _$FarmAnalytics {
   const factory FarmAnalytics({
     required String farmId,
     required String farmName,
-    
-    // Environmental performance
     required double avgTemperature,
     required double avgHumidity,
     required double avgCO2,
     required double tempCompliancePercent,
     required double humidityCompliancePercent,
     required double co2CompliancePercent,
-    
-    // Production metrics
     required int harvestCount,
     required double totalYieldKg,
     required double avgYieldPerHarvest,
     required int daysInProduction,
     required double yieldPerDay,
-    
-    // Stage tracking
     GrowthStage? currentStage,
     required int daysInCurrentStage,
     required int stageTransitions,
-    
-    // System health
     required int totalAlerts,
     required int criticalAlerts,
     required double uptimePercent,
     DateTime? lastConnection,
-    
-    // Time period
     required DateTime periodStart,
     required DateTime periodEnd,
   }) = _FarmAnalytics;
@@ -78,10 +71,10 @@ class HarvestRecord with _$HarvestRecord {
     required Species species,
     required GrowthStage stage,
     required double yieldKg,
-    int? flushNumber, // Which flush (1st, 2nd, etc.)
-    double? qualityScore, // 0-10 quality rating
+    int? flushNumber,
+    double? qualityScore,
     String? notes,
-    List<String>? photoUrls, // Harvest photos
+    List<String>? photoUrls,
     Map<String, dynamic>? metadata,
   }) = _HarvestRecord;
 
@@ -103,19 +96,4 @@ class CrossFarmComparison with _$CrossFarmComparison {
 
   factory CrossFarmComparison.fromJson(Map<String, dynamic> json) =>
       _$CrossFarmComparisonFromJson(json);
-}
-
-/// Device information
-@freezed
-class DeviceInfo with _$DeviceInfo {
-  const factory DeviceInfo({
-    required String deviceId,
-    required String name,
-    required String address,
-    String? farmId,
-    DateTime? lastConnected,
-  }) = _DeviceInfo;
-
-  factory DeviceInfo.fromJson(Map<String, dynamic> json) =>
-      _$DeviceInfoFromJson(json);
 }

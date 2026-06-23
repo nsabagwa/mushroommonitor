@@ -3,21 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:developer' as developer;
 
 import '../core/constants/ble_constants.dart';
-import '../core/utils/ble_serializer.dart';
 import '../providers/current_farm_provider.dart';
 import '../providers/farms_provider.dart';
-import '../providers/ble_provider.dart';
 
 /// Control screen for managing environmental control parameters.
 ///
-/// Allows users to adjust:
-/// - Temperature range (min/max)
-/// - Humidity minimum
-/// - CO₂ maximum
-/// - Light mode and timing
-/// - Manual relay overrides
-///
-/// Uses batch send: changes are applied when "Apply Changes" button is pressed.
+/// BLE connectivity removed. Settings are displayed/edited locally.
+/// Re-wire BLE ops when connectivity is restored.
 class ControlScreen extends ConsumerStatefulWidget {
   const ControlScreen({super.key});
 
@@ -36,9 +28,9 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
   double _rhMin = 60.0;
   int _co2Max = 1000;
   LightMode _lightMode = LightMode.off;
-  int _onMinutes = 960; // 16 hours
-  int _offMinutes = 480; // 8 hours
-  int? _expectedDays; // Track expected days from stage thresholds
+  int _onMinutes = 960;
+  int _offMinutes = 480;
+  int? _expectedDays;
 
   // Override bits
   bool _lightOverride = false;
@@ -53,16 +45,17 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
   String? _errorMessage;
   String? _successMessage;
 
+  // BLE not available — always false until re-wired
+  bool get _isConnected => false;
+
   @override
   void initState() {
     super.initState();
-    // Load current settings when screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCurrentSettings();
     });
   }
 
-  /// Load current control settings from BLE device
   Future<void> _loadCurrentSettings() async {
     setState(() {
       _isLoading = true;
@@ -70,80 +63,16 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     });
 
     try {
-      final bleOps = ref.read(bleOperationsProvider);
-
-      // Load current stage first
-      final stageState = await bleOps.readStageState();
-      if (stageState != null) {
-        setState(() {
-          _currentSpecies = stageState.species;
-          _currentStage = stageState.stage;
-        });
-
-        developer.log(
-          '✅ Loaded current stage: ${stageState.species.displayName} - ${stageState.stage.displayName}',
-          name: 'mushpi.control_screen',
-        );
-
-        // Load stage thresholds for current stage
-        final thresholds = await bleOps.readStageThresholds(
-          stageState.species,
-          stageState.stage,
-        );
-
-        if (thresholds != null) {
-          // Use stage thresholds as initial values
-          setState(() {
-            if (thresholds.tempMin != null) _tempMin = thresholds.tempMin!;
-            if (thresholds.tempMax != null) _tempMax = thresholds.tempMax!;
-            if (thresholds.rhMin != null) _rhMin = thresholds.rhMin!;
-            if (thresholds.co2Max != null) _co2Max = thresholds.co2Max!;
-            if (thresholds.lightMode != null)
-              _lightMode = thresholds.lightMode!;
-            if (thresholds.lightOnMinutes != null)
-              _onMinutes = thresholds.lightOnMinutes!;
-            if (thresholds.lightOffMinutes != null)
-              _offMinutes = thresholds.lightOffMinutes!;
-            if (thresholds.expectedDays != null)
-              _expectedDays = thresholds.expectedDays!;
-          });
-
-          developer.log(
-            '✅ Loaded stage thresholds for current stage (expectedDays: $_expectedDays)',
-            name: 'mushpi.control_screen',
-          );
-        }
-      }
-
-      // Load current control targets (actual applied values)
-      final controlTargets = await bleOps.readControlTargets();
-
-      if (controlTargets != null) {
-        setState(() {
-          _tempMin = controlTargets.tempMin;
-          _tempMax = controlTargets.tempMax;
-          _rhMin = controlTargets.rhMin;
-          _co2Max = controlTargets.co2Max;
-          _lightMode = controlTargets.lightMode;
-          _onMinutes = controlTargets.onMinutes;
-          _offMinutes = controlTargets.offMinutes;
-          _hasChanges = false;
-        });
-
-        developer.log(
-          '✅ Loaded control settings: ${controlTargets.toString()}',
-          name: 'mushpi.control_screen',
-        );
-      }
+      // BLE removed — no device to read from.
+      // Settings remain at defaults until BLE is re-wired.
+      developer.log(
+        'BLE not available — showing default control settings',
+        name: 'mushpi.control_screen',
+      );
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load settings: $e';
       });
-      developer.log(
-        '❌ Failed to load control settings: $e',
-        name: 'mushpi.control_screen',
-        error: e,
-      );
     } finally {
       setState(() {
         _isLoading = false;
@@ -151,9 +80,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     }
   }
 
-  /// Apply changes to BLE device
   Future<void> _applyChanges() async {
-    // Validate
     if (_tempMin >= _tempMax) {
       setState(() {
         _errorMessage = 'Temperature min must be less than max';
@@ -176,84 +103,16 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     });
 
     try {
-      final bleOps = ref.read(bleOperationsProvider);
-
-      // Write control targets
-      final controlTargets = ControlTargetsData(
-        tempMin: _tempMin,
-        tempMax: _tempMax,
-        rhMin: _rhMin,
-        co2Max: _co2Max,
-        lightMode: _lightMode,
-        onMinutes: _onMinutes,
-        offMinutes: _offMinutes,
-      );
-
-      await bleOps.writeControlTargets(controlTargets);
-
+      // BLE removed — nothing to write to yet.
       developer.log(
-        '✅ Applied control settings: ${controlTargets.toString()}',
+        'BLE not available — cannot apply control settings',
         name: 'mushpi.control_screen',
       );
-
-      // Write stage thresholds for current stage (if known)
-      if (_currentSpecies != null && _currentStage != null) {
-        final thresholds = StageThresholdsData(
-          species: _currentSpecies!,
-          stage: _currentStage!,
-          tempMin: _tempMin,
-          tempMax: _tempMax,
-          rhMin: _rhMin,
-          co2Max: _co2Max,
-          lightMode: _lightMode,
-          lightOnMinutes: _onMinutes,
-          lightOffMinutes: _offMinutes,
-          expectedDays: _expectedDays,
-        );
-
-        final thresholdSuccess = await bleOps.writeStageThresholds(thresholds);
-
-        if (thresholdSuccess) {
-          developer.log(
-            '✅ Applied stage thresholds for ${_currentSpecies!.displayName} - ${_currentStage!.displayName}',
-            name: 'mushpi.control_screen',
-          );
-        } else {
-          developer.log(
-            '⚠️ Failed to write stage thresholds (validation failed)',
-            name: 'mushpi.control_screen',
-            level: 900,
-          );
-        }
-      }
-
-      // Write override bits if any are set
-      if (_lightOverride ||
-          _fanOverride ||
-          _mistOverride ||
-          _heaterOverride ||
-          _disableAuto) {
-        int overrideBits = 0;
-        if (_lightOverride) overrideBits |= 0x01;
-        if (_fanOverride) overrideBits |= 0x02;
-        if (_mistOverride) overrideBits |= 0x04;
-        if (_heaterOverride) overrideBits |= 0x08;
-        if (_disableAuto) overrideBits |= 0x80;
-
-        await bleOps.writeOverrideBits(overrideBits);
-
-        developer.log(
-          '✅ Applied override bits: 0x${overrideBits.toRadixString(16)}',
-          name: 'mushpi.control_screen',
-        );
-      }
-
       setState(() {
         _hasChanges = false;
-        _successMessage = 'Settings applied successfully';
+        _successMessage = 'Settings saved locally (device not connected)';
       });
 
-      // Clear success message after 3 seconds
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           setState(() {
@@ -265,11 +124,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
       setState(() {
         _errorMessage = 'Failed to apply settings: $e';
       });
-      developer.log(
-        '❌ Failed to apply control settings: $e',
-        name: 'mushpi.control_screen',
-        error: e,
-      );
     } finally {
       setState(() {
         _isLoading = false;
@@ -277,7 +131,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     }
   }
 
-  /// Mark that changes have been made
   void _markChanged() {
     if (!_hasChanges) {
       setState(() {
@@ -289,7 +142,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedFarmId = ref.watch(selectedMonitoringFarmIdProvider);
-    final isConnected = ref.watch(bleRepositoryProvider).isConnected;
 
     return Scaffold(
       appBar: AppBar(
@@ -304,11 +156,10 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
       ),
       body: selectedFarmId == null
           ? _buildFarmSelector(context)
-          : _buildControlPanel(context, isConnected),
+          : _buildControlPanel(context, _isConnected),
     );
   }
 
-  /// Build farm selector if no farm selected
   Widget _buildFarmSelector(BuildContext context) {
     final farmsAsync = ref.watch(activeFarmsProvider);
 
@@ -325,7 +176,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
                   color: Theme.of(context)
                       .colorScheme
                       .onSurfaceVariant
-                      .withOpacity(0.5),
+                      .withValues(alpha: 0.5),
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -343,7 +194,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
         }
 
         if (farms.length == 1) {
-          // Auto-select single farm
           WidgetsBinding.instance.addPostFrameCallback((_) {
             ref.read(selectedMonitoringFarmIdProvider.notifier).state =
                 farms.first.id;
@@ -351,7 +201,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        // Show farm selector
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: farms.length,
@@ -379,13 +228,11 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     );
   }
 
-  /// Build control panel
   Widget _buildControlPanel(BuildContext context, bool isConnected) {
     return Stack(
       children: [
         SingleChildScrollView(
-          padding:
-              const EdgeInsets.all(16).copyWith(bottom: 88), // Space for FAB
+          padding: const EdgeInsets.all(16).copyWith(bottom: 88),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -483,7 +330,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
                 ),
               ],
 
-              // Success/Error messages
               if (_successMessage != null) ...[
                 const SizedBox(height: 8),
                 Card(
@@ -545,7 +391,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
 
               const SizedBox(height: 16),
 
-              // Temperature Control
               _buildSection(
                 context,
                 title: 'Temperature Range',
@@ -586,7 +431,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
 
               const SizedBox(height: 16),
 
-              // Humidity Control
               _buildSection(
                 context,
                 title: 'Humidity',
@@ -609,7 +453,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
 
               const SizedBox(height: 16),
 
-              // CO₂ Control
               _buildSection(
                 context,
                 title: 'CO₂ Level',
@@ -632,7 +475,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
 
               const SizedBox(height: 16),
 
-              // Light Control
               _buildSection(
                 context,
                 title: 'Light Control',
@@ -695,7 +537,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
 
               const SizedBox(height: 16),
 
-              // Manual Overrides
               _buildSection(
                 context,
                 title: 'Manual Overrides',
@@ -764,8 +605,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
             ],
           ),
         ),
-
-        // Apply Changes FAB
         if (_hasChanges && isConnected)
           Positioned(
             left: 16,
@@ -790,7 +629,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     );
   }
 
-  /// Build section card
   Widget _buildSection(
     BuildContext context, {
     required String title,
@@ -821,7 +659,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     );
   }
 
-  /// Build slider with label and value
   Widget _buildSlider({
     required String label,
     required double value,
@@ -856,7 +693,6 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     );
   }
 
-  /// Build time control (hours and minutes)
   Widget _buildTimeControl({
     required String label,
     required int minutes,
