@@ -380,9 +380,9 @@ class _ThingSpeakCardState extends ConsumerState<_ThingSpeakCard> {
 
   Future<void> _testConnection() async {
     final channelId = _channelController.text.trim();
-    final apiKey = _apiKeyController.text.trim();
+    final readApiKey = _apiKeyController.text.trim();
 
-    if (channelId.isEmpty || apiKey.isEmpty) {
+    if (channelId.isEmpty || readApiKey.isEmpty) {
       setState(() {
         _testResult = 'Please enter both Channel ID and API Key';
         _testPassed = false;
@@ -399,7 +399,7 @@ class _ThingSpeakCardState extends ConsumerState<_ThingSpeakCard> {
     try {
       final reading = await fetchThingSpeakOnce(
         channelId: channelId,
-        readApiKey: apiKey,
+        readApiKey: readApiKey,
       );
       setState(() {
         _testPassed = true;
@@ -426,7 +426,7 @@ class _ThingSpeakCardState extends ConsumerState<_ThingSpeakCard> {
         channelId: _channelController.text.trim().isEmpty
             ? null
             : _channelController.text.trim(),
-        apiKey: _apiKeyController.text.trim().isEmpty
+        readApiKey: _apiKeyController.text.trim().isEmpty
             ? null
             : _apiKeyController.text.trim(),
       );
@@ -480,7 +480,7 @@ class _ThingSpeakCardState extends ConsumerState<_ThingSpeakCard> {
       await ops.updateThingSpeak(
         farmId: widget.farmId,
         channelId: null,
-        apiKey: null,
+        readApiKey: null,
       );
       _channelController.clear();
       _apiKeyController.clear();

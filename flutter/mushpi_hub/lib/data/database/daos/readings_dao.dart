@@ -182,4 +182,19 @@ class ReadingsDao extends DatabaseAccessor<AppDatabase> with _$ReadingsDaoMixin 
           ..orderBy([(r) => OrderingTerm.desc(r.timestamp)]))
         .get();
   }
+
+  /// Insert reading if it doesn't already exist
+  Future<void> insertOrIgnoreReading(Reading reading) async {
+    await into(readings).insert(
+      ReadingsCompanion(
+        farmId: Value(reading.farmId),
+        timestamp: Value(reading.timestamp),
+        temperatureC: Value(reading.temperatureC),
+        relativeHumidity: Value(reading.relativeHumidity),
+        co2Ppm: Value(reading.co2Ppm),
+        lightRaw: Value(reading.lightRaw),
+      ),
+      mode: InsertMode.insertOrIgnore,
+    );
+  }
 }

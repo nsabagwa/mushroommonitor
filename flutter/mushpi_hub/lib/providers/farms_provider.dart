@@ -286,13 +286,13 @@ class FarmOperations {
   Future<void> updateThingSpeak({
     required String farmId,
     String? channelId,
-    String? apiKey,
+    String? readApiKey,
   }) async {
     try {
       await repository.updateThingSpeak(
       farmId: farmId,
       channelId: channelId,
-      readApiKey: apiKey,
+      readApiKey: readApiKey,
       );
       _refreshFarms();
       ref.invalidate(farmByIdProvider(farmId));

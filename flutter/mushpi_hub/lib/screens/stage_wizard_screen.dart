@@ -1364,43 +1364,58 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         ],
       ),
       child: SafeArea(
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (_currentStep > 0)
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _previousStep,
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Previous'),
+            Row(
+              children: [
+                if (_currentStep > 0)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _previousStep,
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('Previous'),
+                    ),
+                  ),
+                if (_currentStep > 0) const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton.icon(
+                    onPressed: _isLoading || !isConnected
+                        ? null
+                        : (_currentStep == _totalSteps - 1
+                            ? _submitAllSettings
+                            : _nextStep),
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(_currentStep == _totalSteps - 1
+                            ? Icons.check
+                            : Icons.arrow_forward),
+                    label: Text(
+                      _isLoading
+                          ? 'Saving...'
+                          : (_currentStep == _totalSteps - 1
+                              ? 'Submit All Settings'
+                              : 'Next Step'),
+                    ),
+                  ),
                 ),
-              ),
-            if (_currentStep > 0) const SizedBox(width: 16),
-            Expanded(
-              flex: 2,
-              child: FilledButton.icon(
-                onPressed: _isLoading || !isConnected
-                    ? null
-                    : (_currentStep == _totalSteps - 1
-                        ? _submitAllSettings
-                        : _nextStep),
-                icon: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(_currentStep == _totalSteps - 1
-                        ? Icons.check
-                        : Icons.arrow_forward),
-                label: Text(
-                  _isLoading
-                      ? 'Saving...'
-                      : (_currentStep == _totalSteps - 1
-                          ? 'Submit All Settings'
-                          : 'Next Step'),
-                ),
-              ),
+              ],
             ),
+            if (_currentStep == _totalSteps - 1 && !isConnected)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Text(
+                  'Please connect to your MushPi device to submit all settings.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                ),
+              ),
           ],
         ),
       ),

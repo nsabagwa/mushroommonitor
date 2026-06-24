@@ -9,6 +9,8 @@ import '../providers/readings_provider.dart';
 import '../providers/current_farm_provider.dart';
 import '../providers/farms_provider.dart';
 
+import 'dart:math' as math;
+
 /// Environmental Chart Screen displaying trend data with customizable time range.
 ///
 /// Shows line charts for:
@@ -149,8 +151,8 @@ class _EnvironmentalChartScreenState
                         unit: '°C',
                         icon: Icons.thermostat,
                         color: Colors.orange,
-                        minValue: 15.0,
-                        maxValue: 35.0,
+                        minValue: 0.0,
+                        maxValue: 40.0,
                         getValue: (r) => r.temperatureC,
                       ),
                       const SizedBox(height: 24),
@@ -160,7 +162,7 @@ class _EnvironmentalChartScreenState
                         unit: '%',
                         icon: Icons.water_drop,
                         color: Colors.blue,
-                        minValue: 70.0,
+                        minValue: 0.0,
                         maxValue: 110.0,
                         getValue: (r) => r.relativeHumidity,
                       ),
@@ -171,8 +173,8 @@ class _EnvironmentalChartScreenState
                         unit: 'ppm',
                         icon: Icons.air,
                         color: Colors.green,
-                        minValue: 300.0,
-                        maxValue: 4000.0,
+                        minValue: 000.0,
+                        maxValue: 10000.0,
                         getValue: (r) => r.co2Ppm.toDouble(),
                       ),
                       const SizedBox(height: 24),
@@ -182,8 +184,8 @@ class _EnvironmentalChartScreenState
                         unit: 'raw',
                         icon: Icons.light_mode,
                         color: Colors.amber,
-                        minValue: 100.0,
-                        maxValue: 600.0,
+                        minValue: -10.0,
+                        maxValue: 1000.0,
                         getValue: (r) => r.lightRaw.toDouble(),
                       ),
                       const SizedBox(height: 80), // Bottom padding
@@ -481,6 +483,9 @@ class _ChartCardState extends State<_ChartCard> {
     final minTime = widget.spots.first.x;
     final maxTime = widget.spots.last.x;
     final totalDuration = maxTime - minTime;
+    const minWindowMs = 60 * 60 * 1000.0; // 1 hour
+    final maxWindowMs = math.max(_defaultWindowMs, totalDuration);
+    final canZoom = totalDuration > minWindowMs;
 
     return Card(
       child: Padding(
@@ -496,15 +501,15 @@ class _ChartCardState extends State<_ChartCard> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.zoom_out),
-                  onPressed: () {
+                  onPressed: canZoom ? () {
                     setState(() {
                       // Increase visible window (zoom out)
                       _visibleWindowMs = (_visibleWindowMs * 1.5).clamp(
                         _defaultWindowMs,
-                        totalDuration,
-                      );
+                        maxWindowMs,
+                      ).toDouble();
                     });
-                  },
+                  } : null,
                   tooltip: 'Zoom Out',
                 ),
                 Text(
@@ -513,15 +518,15 @@ class _ChartCardState extends State<_ChartCard> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.zoom_in),
-                  onPressed: () {
+                  onPressed: canZoom ? () {
                     setState(() {
                       // Decrease visible window (zoom in)
                       _visibleWindowMs = (_visibleWindowMs / 1.5).clamp(
-                        60 * 60 * 1000, // Minimum 1 hour
-                        totalDuration,
-                      );
+                        minWindowMs,
+                        maxWindowMs,
+                      ).toDouble();
                     });
-                  },
+                  } : null,
                   tooltip: 'Zoom In',
                 ),
               ],
@@ -554,7 +559,7 @@ class _ChartCardState extends State<_ChartCard> {
               Slider(
                 value: _scrollOffset,
                 min: 0,
-                max: (maxTime - _visibleWindowMs).clamp(0, double.infinity),
+                max: math.max(0.0, maxTime - _visibleWindowMs),
                 onChanged: (value) {
                   setState(() {
                     _scrollOffset = value;
@@ -792,7 +797,7 @@ List<FlSpot> _createSpots(
       .map((reading) {
         final value = getValue(reading);
         // Filter out zero, negative values, and values exceeding max
-        if (value <= 0 || value > maxValue || value < minValue) return null;
+        if (value < 0 || value > maxValue || value < minValue) return null;
         // Use milliseconds since epoch as x-value to show accurate time gaps
         return FlSpot(
           reading.timestamp.millisecondsSinceEpoch.toDouble(),
