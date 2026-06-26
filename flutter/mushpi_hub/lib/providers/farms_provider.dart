@@ -3,12 +3,11 @@ import 'package:mushpi_hub/data/repositories/farm_repository.dart';
 import 'package:mushpi_hub/data/repositories/alert_sync_repository.dart';
 import 'package:mushpi_hub/data/models/farm.dart';
 import 'package:mushpi_hub/core/constants/ble_constants.dart';
-import 'package:mushpi_hub/providers/database_provider.dart';
 import 'dart:developer' as developer;
 
+/// Firebase-backed now -- no longer needs the local Drift database.
 final farmRepositoryProvider = Provider<FarmRepository>((ref) {
-  final database = ref.watch(databaseProvider);
-  return FarmRepository(database);
+  return FarmRepository();
 });
 
 /// Mirrors farm/threshold data to Firestore so the backend email-alert

@@ -39,9 +39,10 @@ class DefaultFirebaseOptions {
     messagingSenderId: '692396303316',
     projectId: 'mushpi-hub',
     storageBucket: 'mushpi-hub.firebasestorage.app',
+    databaseURL: 'https://mushpi-hub-default-rtdb.firebaseio.com',
   );
 
-  // Web app config (from Firebase console "Your apps" → web)
+  // Web app config (from Firebase console "Your apps" -> web)
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyDeMt5d8Xy3Q0aVtZRVQhDzr2i2IFbyffY',
     appId: '1:692396303316:web:66fa4b4ddbf8e173296c41',
@@ -50,5 +51,6 @@ class DefaultFirebaseOptions {
     authDomain: 'mushpi-hub.firebaseapp.com',
     storageBucket: 'mushpi-hub.firebasestorage.app',
     measurementId: 'G-L6MZBVBHXH',
+    databaseURL: 'https://mushpi-hub-default-rtdb.firebaseio.com',
   );
 }

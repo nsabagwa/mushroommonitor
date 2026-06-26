@@ -9,9 +9,20 @@ import 'app.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // On Android, the Google Services Gradle plugin (triggered by
+  // google-services.json) auto-initializes the default Firebase app
+  // natively before Dart code runs. Checking Firebase.apps.isEmpty isn't
+  // reliable here because the Dart-side app list can lag behind what's
+  // already registered natively, so we catch the specific duplicate-app
+  // error instead.
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on FirebaseException catch (e) {
+    if (e.code != 'duplicate-app') rethrow;
+    // Already initialized natively — fine, continue.
+  }
 
   await FirebaseAuth.instance.signOut();
 

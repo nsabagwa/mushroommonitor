@@ -1,34 +1,78 @@
-import 'dart:convert';
+// lib/data/repositories/farm_repository.dart
+//
+// Firebase Realtime Database-backed repository. Replaces the old Drift/
+// SQLite version so farms and harvests are shared in real time across every
+// device a user logs into (web, Android, iOS) instead of being trapped in
+// that one device's local database.
+//
+// Data layout in Firebase:
+//   users/{uid}/farms/{farmId}      -> Farm fields (flat map)
+//   users/{uid}/harvests/{harvestId} -> Harvest fields (flat map)
+//
+// Live sensor readings are NOT stored here — they continue to come straight
+// from ThingSpeak (see thingspeak_repository.dart / readings_provider.dart),
+// which already works the same on every device since it's a cloud API.
+// Drift's Readings table remains in place purely as an offline-fallback
+// cache and isn't touched by this file.
+
 import 'dart:developer' as developer;
-import 'package:drift/drift.dart';
-import '../database/app_database.dart';
-import '../models/farm.dart' as models;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:mushpi_hub/core/constants/ble_constants.dart';
+import 'package:mushpi_hub/data/models/farm.dart' as models;
 
 class FarmRepository {
-  final AppDatabase _database;
-  FarmRepository(this._database);
+  FarmRepository({FirebaseDatabase? database, FirebaseAuth? auth})
+      : _database = database ?? FirebaseDatabase.instance,
+        _auth = auth ?? FirebaseAuth.instance;
+
+  final FirebaseDatabase _database;
+  final FirebaseAuth _auth;
+
+  String get _uid {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FarmRepositoryException(
+          'No signed-in user — cannot access farm data.');
+    }
+    return user.uid;
+  }
+
+  DatabaseReference get _farmsRef => _database.ref('users/$_uid/farms');
+  DatabaseReference get _harvestsRef => _database.ref('users/$_uid/harvests');
 
   // ── FARM CRUD ──────────────────────────────────────────────────────────────
 
   Future<List<models.Farm>> getAllFarms() async {
-    final rows = await _database.farmsDao.getAllFarms();
-    return rows.map(_farmFromDrift).toList();
+    final snapshot = await _farmsRef.get();
+    if (!snapshot.exists || snapshot.value == null) return [];
+
+    final raw = Map<String, dynamic>.from(snapshot.value as Map);
+    final farms = raw.values
+        .map((v) => _farmFromMap(Map<String, dynamic>.from(v as Map)))
+        .toList();
+    farms.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return farms;
   }
 
   Future<List<models.Farm>> getActiveFarms() async {
-    final rows = await _database.farmsDao.getActiveFarms();
-    return rows.map(_farmFromDrift).toList();
+    final all = await getAllFarms();
+    return all.where((f) => f.isActive).toList();
   }
 
   Future<models.Farm?> getFarmById(String id) async {
-    final row = await _database.farmsDao.getFarmById(id);
-    return row != null ? _farmFromDrift(row) : null;
+    final snapshot = await _farmsRef.child(id).get();
+    if (!snapshot.exists || snapshot.value == null) return null;
+    return _farmFromMap(Map<String, dynamic>.from(snapshot.value as Map));
   }
 
   Future<models.Farm?> getFarmByChannelId(String channelId) async {
-    final row = await _database.farmsDao.getFarmByChannelId(channelId);
-    return row != null ? _farmFromDrift(row) : null;
+    final all = await getAllFarms();
+    try {
+      return all.firstWhere((f) => f.thingSpeakChannelId == channelId);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Create a new farm linked to a ThingSpeak channel.
@@ -44,26 +88,24 @@ class FarmRepository {
     String? imageUrl,
     Map<String, dynamic>? metadata,
   }) async {
-    final companion = FarmsCompanion(
-      id: Value(id),
-      name: Value(name),
-      thingSpeakChannelId: Value(thingSpeakChannelId),
-      thingSpeakReadApiKey: Value(thingSpeakReadApiKey),
-      thingSpeakFieldMap: Value(
-        thingSpeakFieldMap != null ? jsonEncode(thingSpeakFieldMap) : null,
-      ),
-      location: Value(location),
-      notes: Value(notes),
-      createdAt: Value(DateTime.now()),
-      totalHarvests: const Value(0),
-      totalYieldKg: const Value(0.0),
-      primarySpecies: Value(primarySpecies?.id),
-      imageUrl: Value(imageUrl),
-      isActive: const Value(true),
-      metadata: Value(metadata != null ? jsonEncode(metadata) : null),
+    final farm = models.Farm(
+      id: id,
+      name: name,
+      thingSpeakChannelId: thingSpeakChannelId,
+      thingSpeakReadApiKey: thingSpeakReadApiKey,
+      thingSpeakFieldMap: thingSpeakFieldMap,
+      location: location,
+      notes: notes,
+      createdAt: DateTime.now(),
+      totalHarvests: 0,
+      totalYieldKg: 0.0,
+      primarySpecies: primarySpecies,
+      imageUrl: imageUrl,
+      isActive: true,
+      metadata: metadata,
     );
 
-    await _database.farmsDao.insertFarm(companion);
+    await _farmsRef.child(id).set(_farmToMap(farm));
     developer.log('Farm created: $name (channel: $thingSpeakChannelId)',
         name: 'FarmRepository');
     return id;
@@ -81,47 +123,55 @@ class FarmRepository {
     bool? isActive,
     Map<String, dynamic>? metadata,
   }) async {
-    final companion = FarmsCompanion(
-      id: Value(id),
-      name: name != null ? Value(name) : const Value.absent(),
-      thingSpeakReadApiKey: thingSpeakReadApiKey != null
-          ? Value(thingSpeakReadApiKey)
-          : const Value.absent(),
-      thingSpeakFieldMap: thingSpeakFieldMap != null
-          ? Value(jsonEncode(thingSpeakFieldMap))
-          : const Value.absent(),
-      location: location != null ? Value(location) : const Value.absent(),
-      notes: notes != null ? Value(notes) : const Value.absent(),
-      primarySpecies: primarySpecies != null
-          ? Value(primarySpecies.id)
-          : const Value.absent(),
-      imageUrl: imageUrl != null ? Value(imageUrl) : const Value.absent(),
-      isActive: isActive != null ? Value(isActive) : const Value.absent(),
-      metadata:
-          metadata != null ? Value(jsonEncode(metadata)) : const Value.absent(),
-    );
-    await _database.farmsDao.updateFarm(companion);
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (thingSpeakReadApiKey != null) {
+      updates['thingSpeakReadApiKey'] = thingSpeakReadApiKey;
+    }
+    if (thingSpeakFieldMap != null) {
+      updates['thingSpeakFieldMap'] = thingSpeakFieldMap;
+    }
+    if (location != null) updates['location'] = location;
+    if (notes != null) updates['notes'] = notes;
+    if (primarySpecies != null) updates['primarySpecies'] = primarySpecies.id;
+    if (imageUrl != null) updates['imageUrl'] = imageUrl;
+    if (isActive != null) updates['isActive'] = isActive;
+    if (metadata != null) updates['metadata'] = metadata;
+
+    if (updates.isEmpty) return;
+    await _farmsRef.child(id).update(updates);
   }
 
   Future<void> deleteFarm(String id) async {
-    await _database.farmsDao.deleteFarm(id);
+    await _farmsRef.child(id).remove();
+    // Clean up any harvests that belonged to this farm.
+    final snapshot =
+        await _harvestsRef.orderByChild('farmId').equalTo(id).get();
+    if (snapshot.exists && snapshot.value != null) {
+      final raw = Map<String, dynamic>.from(snapshot.value as Map);
+      for (final harvestId in raw.keys) {
+        await _harvestsRef.child(harvestId).remove();
+      }
+    }
   }
 
   Future<void> archiveFarm(String farmId) async {
-    await _database.farmsDao.setFarmActive(farmId, false);
+    await _farmsRef.child(farmId).update({'isActive': false});
   }
 
   Future<void> restoreFarm(String farmId) async {
-    await _database.farmsDao.setFarmActive(farmId, true);
+    await _farmsRef.child(farmId).update({'isActive': true});
   }
 
   // Mark farm as recently fetched (replaces BLE lastActive)
   Future<void> updateLastActive(String farmId) async {
-    await _database.farmsDao.updateLastActive(farmId, DateTime.now());
+    await _farmsRef
+        .child(farmId)
+        .update({'lastActive': DateTime.now().toIso8601String()});
   }
 
   Future<void> clearLastActive(String farmId) async {
-    await _database.farmsDao.clearLastActive(farmId);
+    await _farmsRef.child(farmId).update({'lastActive': null});
   }
 
   // ── HARVESTS ───────────────────────────────────────────────────────────────
@@ -139,27 +189,36 @@ class FarmRepository {
     List<String>? photoUrls,
     Map<String, dynamic>? metadata,
   }) async {
-    final companion = HarvestsCompanion(
-      id: Value(id),
-      farmId: Value(farmId),
-      harvestDate: Value(harvestDate),
-      species: Value(species.id),
-      stage: Value(stage.id),
-      yieldKg: Value(yieldKg),
-      flushNumber: Value(flushNumber),
-      qualityScore: Value(qualityScore),
-      notes: Value(notes),
-      photoUrls: Value(photoUrls != null ? jsonEncode(photoUrls) : null),
-      metadata: Value(metadata != null ? jsonEncode(metadata) : null),
+    final harvest = models.HarvestRecord(
+      id: id,
+      farmId: farmId,
+      harvestDate: harvestDate,
+      species: species,
+      stage: stage,
+      yieldKg: yieldKg,
+      flushNumber: flushNumber,
+      qualityScore: qualityScore,
+      notes: notes,
+      photoUrls: photoUrls,
+      metadata: metadata,
     );
-    await _database.harvestsDao.insertHarvest(companion);
+
+    await _harvestsRef.child(id).set(_harvestToMap(harvest));
     await recalculateProductionMetrics(farmId);
     return id;
   }
 
   Future<List<models.HarvestRecord>> getHarvestsForFarm(String farmId) async {
-    final rows = await _database.harvestsDao.getHarvestsByFarmId(farmId);
-    return rows.map(_harvestFromDrift).toList();
+    final snapshot =
+        await _harvestsRef.orderByChild('farmId').equalTo(farmId).get();
+    if (!snapshot.exists || snapshot.value == null) return [];
+
+    final raw = Map<String, dynamic>.from(snapshot.value as Map);
+    final harvests = raw.values
+        .map((v) => _harvestFromMap(Map<String, dynamic>.from(v as Map)))
+        .toList();
+    harvests.sort((a, b) => b.harvestDate.compareTo(a.harvestDate));
+    return harvests;
   }
 
   Future<List<models.HarvestRecord>> getHarvestsForPeriod(
@@ -167,27 +226,33 @@ class FarmRepository {
     DateTime startDate,
     DateTime endDate,
   ) async {
-    final rows = await _database.harvestsDao
-        .getHarvestsByFarmAndPeriod(farmId, startDate, endDate);
-    return rows.map(_harvestFromDrift).toList();
+    final all = await getHarvestsForFarm(farmId);
+    return all
+        .where((h) =>
+            h.harvestDate.isAfter(startDate) && h.harvestDate.isBefore(endDate))
+        .toList();
   }
 
   // ── PRODUCTION METRICS ─────────────────────────────────────────────────────
 
   Future<void> recalculateProductionMetrics(String farmId) async {
-    final count = await _database.harvestsDao.getHarvestCountByFarm(farmId);
-    final yield_ = await _database.harvestsDao.getTotalYieldByFarm(farmId);
-    await _database.farmsDao.updateProductionMetrics(farmId, count, yield_);
+    final harvests = await getHarvestsForFarm(farmId);
+    final count = harvests.length;
+    final totalYield = harvests.fold<double>(0.0, (sum, h) => sum + h.yieldKg);
+    await _farmsRef.child(farmId).update({
+      'totalHarvests': count,
+      'totalYieldKg': totalYield,
+    });
   }
 
   Future<FarmStats?> getFarmStats(String farmId) async {
-    final farm = await _database.farmsDao.getFarmById(farmId);
+    final farm = await getFarmById(farmId);
     if (farm == null) return null;
 
-    final count = await _database.harvestsDao.getHarvestCountByFarm(farmId);
-    final totalYield = await _database.harvestsDao.getTotalYieldByFarm(farmId);
-    final avgYield = await _database.harvestsDao.getAverageYieldByFarm(farmId);
-    final latest = await _database.readingsDao.getLatestReadingByFarm(farmId);
+    final harvests = await getHarvestsForFarm(farmId);
+    final count = harvests.length;
+    final totalYield = harvests.fold<double>(0.0, (sum, h) => sum + h.yieldKg);
+    final avgYield = count > 0 ? totalYield / count : 0.0;
     final days = DateTime.now().difference(farm.createdAt).inDays;
 
     return FarmStats(
@@ -199,68 +264,114 @@ class FarmRepository {
       daysActive: days,
       yieldPerDay: days > 0 ? totalYield / days : 0.0,
       lastConnection: farm.lastActive,
-      currentTemperature: latest?.temperatureC,
-      currentHumidity: latest?.relativeHumidity,
-      currentCO2: latest?.co2Ppm,
+      // Live readings still come from ThingSpeak via readings_provider /
+      // current_farm_provider — not duplicated here.
+      currentTemperature: null,
+      currentHumidity: null,
+      currentCO2: null,
     );
   }
 
-  // ── HELPERS ────────────────────────────────────────────────────────────────
+  // ── SERIALIZATION HELPERS ──────────────────────────────────────────────────
 
-  models.Farm _farmFromDrift(Farm farm) {
+  Map<String, dynamic> _farmToMap(models.Farm farm) {
+    return {
+      'id': farm.id,
+      'name': farm.name,
+      'thingSpeakChannelId': farm.thingSpeakChannelId,
+      'thingSpeakReadApiKey': farm.thingSpeakReadApiKey,
+      'thingSpeakFieldMap': farm.thingSpeakFieldMap,
+      'location': farm.location,
+      'notes': farm.notes,
+      'createdAt': farm.createdAt.toIso8601String(),
+      'lastActive': farm.lastActive?.toIso8601String(),
+      'totalHarvests': farm.totalHarvests,
+      'totalYieldKg': farm.totalYieldKg,
+      'primarySpecies': farm.primarySpecies?.id,
+      'imageUrl': farm.imageUrl,
+      'isActive': farm.isActive,
+      'metadata': farm.metadata,
+    };
+  }
+
+  models.Farm _farmFromMap(Map<String, dynamic> map) {
     Map<String, String>? fieldMap;
-    if (farm.thingSpeakFieldMap != null) {
-      try {
-        final decoded = jsonDecode(farm.thingSpeakFieldMap!) as Map;
-        fieldMap = decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
-      } catch (_) {}
+    final rawFieldMap = map['thingSpeakFieldMap'];
+    if (rawFieldMap != null) {
+      fieldMap = Map<String, dynamic>.from(rawFieldMap as Map)
+          .map((k, v) => MapEntry(k.toString(), v.toString()));
+    }
+
+    Map<String, dynamic>? metadata;
+    final rawMetadata = map['metadata'];
+    if (rawMetadata != null) {
+      metadata = Map<String, dynamic>.from(rawMetadata as Map);
     }
 
     return models.Farm(
-      id: farm.id,
-      name: farm.name,
-      thingSpeakChannelId: farm.thingSpeakChannelId,
-      thingSpeakReadApiKey: farm.thingSpeakReadApiKey,
+      id: map['id'] as String,
+      name: map['name'] as String,
+      thingSpeakChannelId: map['thingSpeakChannelId'] as String,
+      thingSpeakReadApiKey: map['thingSpeakReadApiKey'] as String,
       thingSpeakFieldMap: fieldMap,
-      location: farm.location,
-      notes: farm.notes,
-      createdAt: farm.createdAt,
-      lastActive: farm.lastActive,
-      totalHarvests: farm.totalHarvests,
-      totalYieldKg: farm.totalYieldKg,
-      primarySpecies: farm.primarySpecies != null
-          ? Species.fromId(farm.primarySpecies!)
+      location: map['location'] as String?,
+      notes: map['notes'] as String?,
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      lastActive: map['lastActive'] != null
+          ? DateTime.parse(map['lastActive'] as String)
           : null,
-      imageUrl: farm.imageUrl,
-      isActive: farm.isActive,
-      metadata: farm.metadata != null
-          ? jsonDecode(farm.metadata!) as Map<String, dynamic>
+      totalHarvests: (map['totalHarvests'] as num?)?.toInt() ?? 0,
+      totalYieldKg: (map['totalYieldKg'] as num?)?.toDouble() ?? 0.0,
+      primarySpecies: map['primarySpecies'] != null
+          ? Species.fromId(map['primarySpecies'] as int)
           : null,
+      imageUrl: map['imageUrl'] as String?,
+      isActive: map['isActive'] as bool? ?? true,
+      metadata: metadata,
     );
   }
 
-  models.HarvestRecord _harvestFromDrift(Harvest harvest) {
+  Map<String, dynamic> _harvestToMap(models.HarvestRecord harvest) {
+    return {
+      'id': harvest.id,
+      'farmId': harvest.farmId,
+      'harvestDate': harvest.harvestDate.toIso8601String(),
+      'species': harvest.species.id,
+      'stage': harvest.stage.id,
+      'yieldKg': harvest.yieldKg,
+      'flushNumber': harvest.flushNumber,
+      'qualityScore': harvest.qualityScore,
+      'notes': harvest.notes,
+      'photoUrls': harvest.photoUrls,
+      'metadata': harvest.metadata,
+    };
+  }
+
+  models.HarvestRecord _harvestFromMap(Map<String, dynamic> map) {
     List<String>? photos;
-    if (harvest.photoUrls != null) {
-      try {
-        photos = (jsonDecode(harvest.photoUrls!) as List).cast<String>();
-      } catch (_) {}
+    final rawPhotos = map['photoUrls'];
+    if (rawPhotos != null) {
+      photos = List<dynamic>.from(rawPhotos as List).cast<String>();
+    }
+
+    Map<String, dynamic>? metadata;
+    final rawMetadata = map['metadata'];
+    if (rawMetadata != null) {
+      metadata = Map<String, dynamic>.from(rawMetadata as Map);
     }
 
     return models.HarvestRecord(
-      id: harvest.id,
-      farmId: harvest.farmId,
-      harvestDate: harvest.harvestDate,
-      species: Species.fromId(harvest.species),
-      stage: GrowthStage.fromId(harvest.stage),
-      yieldKg: harvest.yieldKg,
-      flushNumber: harvest.flushNumber,
-      qualityScore: harvest.qualityScore,
-      notes: harvest.notes,
+      id: map['id'] as String,
+      farmId: map['farmId'] as String,
+      harvestDate: DateTime.parse(map['harvestDate'] as String),
+      species: Species.fromId(map['species'] as int),
+      stage: GrowthStage.fromId(map['stage'] as int),
+      yieldKg: (map['yieldKg'] as num).toDouble(),
+      flushNumber: (map['flushNumber'] as num?)?.toInt(),
+      qualityScore: (map['qualityScore'] as num?)?.toDouble(),
+      notes: map['notes'] as String?,
       photoUrls: photos,
-      metadata: harvest.metadata != null
-          ? jsonDecode(harvest.metadata!) as Map<String, dynamic>
-          : null,
+      metadata: metadata,
     );
   }
 }

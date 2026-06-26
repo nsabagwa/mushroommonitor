@@ -2,17 +2,13 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mushpi_hub/data/config/thingspeak_config.dart';
-import 'package:mushpi_hub/data/database/app_database.dart';
+import 'package:mushpi_hub/data/database/app_database.dart' show Reading;
+import 'package:mushpi_hub/data/models/farm.dart';
 import 'package:mushpi_hub/data/repositories/thingspeak_repository.dart';
 import 'package:mushpi_hub/providers/current_farm_provider.dart';
 import 'package:mushpi_hub/providers/database_provider.dart';
+import 'package:mushpi_hub/providers/farms_provider.dart';
 import 'dart:developer' as developer;
-
-/// Build a ThingSpeakConfig from a farm row, or return null if unconfigured.
-ThingSpeakConfig? _configFromFarm(dynamic farmDao, String farmId) {
-  // farmDao is the Drift Farm row — access channelId/apiKey directly
-  return null; // resolved below via farmsDao lookup
-}
 
 List<Reading> _mergeReadings(List<Reading> local, List<Reading> remote) {
   if (remote.isEmpty) return local;
@@ -29,28 +25,23 @@ List<Reading> _mergeReadings(List<Reading> local, List<Reading> remote) {
   return merged;
 }
 
-Future<ThingSpeakConfig?> _getConfig(dynamic farmsDao, String farmId) async {
-  try {
-    final row = await farmsDao.getFarmById(farmId);
-    if (row == null) return null;
-    if (row.thingSpeakChannelId.isEmpty || row.thingSpeakReadApiKey.isEmpty) {
-      return null;
-    }
-    return ThingSpeakConfig.fromFarm(
-      channelId: row.thingSpeakChannelId,
-      readApiKey: row.thingSpeakReadApiKey,
-      fieldMap: row.thingSpeakFieldMap != null
-          ? Map<String, String>.from(row.thingSpeakFieldMap as Map)
-          : null,
-    );
-  } catch (_) {
+/// Build a ThingSpeakConfig from the farm's Firebase record.
+/// (Previously this read from the local Drift farmsDao, which is no longer
+/// the source of truth for farm data now that farms live in Firebase.)
+ThingSpeakConfig? _configFromFarm(Farm? farm) {
+  if (farm == null) return null;
+  if (farm.thingSpeakChannelId.isEmpty || farm.thingSpeakReadApiKey.isEmpty) {
     return null;
   }
+  return ThingSpeakConfig.fromFarm(
+    channelId: farm.thingSpeakChannelId,
+    readApiKey: farm.thingSpeakReadApiKey,
+    fieldMap: farm.thingSpeakFieldMap,
+  );
 }
 
 final last24HoursReadingsProvider = FutureProvider<List<Reading>>((ref) async {
   final readingsDao = ref.watch(readingsDaoProvider);
-  final farmsDao = ref.watch(farmsDaoProvider);
   final selectedFarmId = ref.watch(selectedMonitoringFarmIdProvider);
 
   if (selectedFarmId == null) {
@@ -70,7 +61,8 @@ final last24HoursReadingsProvider = FutureProvider<List<Reading>>((ref) async {
         'Fetched ${localReadings.length} local readings for last 24 hours',
         name: 'mushpi.providers.readings');
 
-    final config = await _getConfig(farmsDao, selectedFarmId);
+    final farm = await ref.watch(farmByIdProvider(selectedFarmId).future);
+    final config = _configFromFarm(farm);
     if (config == null) return localReadings;
 
     final tsRepo = const ThingSpeakRepository();
@@ -103,7 +95,6 @@ final last24HoursReadingsProvider = FutureProvider<List<Reading>>((ref) async {
 final readingsByPeriodProvider = FutureProvider.family<List<Reading>,
     ({String farmId, DateTime start, DateTime end})>((ref, params) async {
   final readingsDao = ref.watch(readingsDaoProvider);
-  final farmsDao = ref.watch(farmsDaoProvider);
 
   try {
     final localReadings = await readingsDao.getReadingsByFarmAndPeriod(
@@ -113,7 +104,8 @@ final readingsByPeriodProvider = FutureProvider.family<List<Reading>,
         'Fetched ${localReadings.length} local readings for custom period',
         name: 'mushpi.providers.readings');
 
-    final config = await _getConfig(farmsDao, params.farmId);
+    final farm = await ref.watch(farmByIdProvider(params.farmId).future);
+    final config = _configFromFarm(farm);
     if (config == null) return localReadings;
 
     final tsRepo = const ThingSpeakRepository();
