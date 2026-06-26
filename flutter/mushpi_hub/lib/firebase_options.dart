@@ -5,11 +5,12 @@
 // ignore_for_file: type=lint
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
+    if (kIsWeb) return web;
     if (defaultTargetPlatform == TargetPlatform.android) {
       return android;
     }
@@ -19,6 +20,9 @@ class DefaultFirebaseOptions {
         'DefaultFirebaseOptions have not been configured for ios - '
         'register an iOS app in the Firebase console and add its values here.',
       );
+    }
+    if (kIsWeb) {
+      return web;
     }
     if (defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux ||

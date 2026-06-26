@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
+import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
 import 'tables/tables.dart';
 import 'daos/farms_dao.dart';
 import 'daos/harvests_dao.dart';
@@ -36,11 +34,19 @@ class AppDatabase extends _$AppDatabase {
         },
       );
 
-  static LazyDatabase _openConnection() {
-    return LazyDatabase(() async {
-      final dbFolder = await getApplicationDocumentsDirectory();
-      final file = File(p.join(dbFolder.path, 'mushpi.db'));
-      return NativeDatabase(file);
-    });
+  // drift_flutter automatically uses:
+  //   SQLite (via sqlite3_flutter_libs) on Android/iOS
+  //   IndexedDB                         on Web
+  static QueryExecutor _openConnection() {
+    return driftDatabase(
+      name: 'mushpi_hub',
+      web: DriftWebOptions(
+        sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+        driftWorker: Uri.parse('drift_worker.js'),
+      ),
+      native: DriftNativeOptions(
+        databaseDirectory: getApplicationDocumentsDirectory,
+      ),
+    );
   }
 }

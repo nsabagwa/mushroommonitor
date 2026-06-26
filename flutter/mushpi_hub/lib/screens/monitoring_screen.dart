@@ -632,10 +632,15 @@ class _ThingSpeakInfoCard extends StatelessWidget {
               children: [
                 Icon(Icons.cloud, color: cs.primary),
                 const SizedBox(width: 8),
-                Text('ThingSpeak Channel',
+                Expanded(
+                  child: Text(
+                    'ThingSpeak Channel',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                        )),
+                        ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -729,7 +734,9 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
                       ),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
                     // ThingSpeak badge
                     Container(
@@ -758,7 +765,6 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
                     // Timestamp chip (if data available)
                     readingAsync.when(
                       data: (r) => r != null
