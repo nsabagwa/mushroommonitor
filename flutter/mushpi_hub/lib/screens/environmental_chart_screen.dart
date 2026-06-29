@@ -638,6 +638,7 @@ class _ChartCardState extends State<_ChartCard> {
     final visibleMaxX = _scrollOffset + _visibleWindowMs;
 
     return LineChartData(
+      clipData: const FlClipData.all(),
       gridData: FlGridData(
         show: true,
         drawVerticalLine: true,
@@ -710,11 +711,19 @@ class _ChartCardState extends State<_ChartCard> {
       borderData: FlBorderData(
         show: true,
         border: Border(
+          top: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+            width: 1,
+          ),
           bottom: BorderSide(
             color: Theme.of(context).colorScheme.outlineVariant,
             width: 1,
           ),
           left: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+            width: 1,
+          ),
+          right: BorderSide(
             color: Theme.of(context).colorScheme.outlineVariant,
             width: 1,
           ),
@@ -729,6 +738,7 @@ class _ChartCardState extends State<_ChartCard> {
         LineChartBarData(
           spots: widget.spots,
           isCurved: true,
+          preventCurveOverShooting: true,
           color: widget.color,
           barWidth: 3,
           dotData: FlDotData(
