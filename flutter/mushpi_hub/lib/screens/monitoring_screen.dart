@@ -818,52 +818,32 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
 
                 return Column(
                   children: [
-                    // Row 1: Temperature + Humidity
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _MetricTile(
-                            icon: Icons.thermostat_rounded,
-                            label: 'Temperature',
-                            value:
-                                '${reading.temperatureC.toStringAsFixed(1)}°C',
-                            color: _tempColor(reading.temperatureC),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _MetricTile(
-                            icon: Icons.water_drop_rounded,
-                            label: 'Humidity',
-                            value:
-                                '${reading.relativeHumidity.toStringAsFixed(0)}%',
-                            color: _rhColor(reading.relativeHumidity),
-                          ),
-                        ),
-                      ],
+                    _MetricTile(
+                      icon: Icons.thermostat_rounded,
+                      label: 'Temperature',
+                      value: '${reading.temperatureC.toStringAsFixed(1)}°C',
+                      color: _tempColor(reading.temperatureC),
                     ),
                     const SizedBox(height: 10),
-                    // Row 2: CO₂ + Light
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _MetricTile(
-                            icon: Icons.air_rounded,
-                            label: 'CO₂',
-                            value: '${reading.co2Ppm} ppm',
-                            color: _co2Color(reading.co2Ppm),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _MetricTile(
-                            icon: Icons.light_mode_rounded,
-                            label: 'Light',
-                            value: reading.lightRaw.toString(),
-                            color: Colors.amber.shade700,
-                          ),
-                        ),
-                      ],
+                    _MetricTile(
+                      icon: Icons.water_drop_rounded,
+                      label: 'Humidity',
+                      value: '${reading.relativeHumidity.toStringAsFixed(0)}%',
+                      color: _rhColor(reading.relativeHumidity),
+                    ),
+                    const SizedBox(height: 10),
+                    _MetricTile(
+                      icon: Icons.air_rounded,
+                      label: 'CO₂',
+                      value: '${reading.co2Ppm} ppm',
+                      color: _co2Color(reading.co2Ppm),
+                    ),
+                    const SizedBox(height: 10),
+                    _MetricTile(
+                      icon: Icons.light_mode_rounded,
+                      label: 'Light',
+                      value: reading.lightRaw.toString(),
+                      color: Colors.amber.shade700,
                     ),
                   ],
                 );
@@ -931,7 +911,7 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
   }
 }
 
-/// Attractive card-style metric tile (replaces the old inline row widget)
+/// Attractive card-style metric tile (full-width row layout)
 class _MetricTile extends StatelessWidget {
   const _MetricTile({
     required this.icon,
@@ -948,31 +928,35 @@ class _MetricTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ],
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: color,
                   fontWeight: FontWeight.bold,
                 ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../providers/app_state_provider.dart';
 import '../widgets/theme_selector.dart';
@@ -24,10 +23,6 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
       ),
       body: ListView(
         children: [
@@ -40,7 +35,8 @@ class SettingsScreen extends ConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.palette_outlined),
                   title: const Text('Theme'),
-                  subtitle: Text(_getThemeModeLabel(ref.watch(themeModeProvider))),
+                  subtitle:
+                      Text(_getThemeModeLabel(ref.watch(themeModeProvider))),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => ThemeSelector.showBottomSheet(context),
                 ),
