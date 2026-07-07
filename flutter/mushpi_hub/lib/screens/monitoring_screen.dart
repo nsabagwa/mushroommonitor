@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../providers/farms_provider.dart';
 import '../providers/current_farm_provider.dart';
@@ -656,7 +657,8 @@ class _ThingSpeakInfoCard extends StatelessWidget {
             ),
             if (farm.lastActive != null) ...[
               const SizedBox(height: 6),
-              _InfoRow(label: 'Last fetch', value: _timeAgo(farm.lastActive!)),
+              _InfoRow(
+                  label: 'Last fetch', value: _fetchTime(farm.lastActive!)),
             ],
           ],
         ),
@@ -664,13 +666,8 @@ class _ThingSpeakInfoCard extends StatelessWidget {
     );
   }
 
-  String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inSeconds < 60) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
-  }
+  /// Shows the actual time data was fetched, e.g. "3:45 PM".
+  String _fetchTime(DateTime dt) => DateFormat('h:mm a').format(dt.toLocal());
 }
 
 class _InfoRow extends StatelessWidget {
@@ -1078,13 +1075,8 @@ class _TimestampChip extends StatelessWidget {
   const _TimestampChip({required this.timestamp});
   final DateTime timestamp;
 
-  String _timeAgo() {
-    final diff = DateTime.now().difference(timestamp);
-    if (diff.inSeconds < 60) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
-  }
+  /// Shows the actual time data was fetched, e.g. "3:45 PM".
+  String _formattedTime() => DateFormat('h:mm a').format(timestamp.toLocal());
 
   @override
   Widget build(BuildContext context) {
@@ -1104,7 +1096,7 @@ class _TimestampChip extends StatelessWidget {
               size: 13, color: isRecent ? Colors.green : Colors.grey),
           const SizedBox(width: 4),
           Text(
-            _timeAgo(),
+            _formattedTime(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: isRecent ? Colors.green : Colors.grey,
                   fontWeight: FontWeight.bold,
