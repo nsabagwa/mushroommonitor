@@ -149,7 +149,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
         data: (farms) {
           if (farms.isEmpty) {
             return _EmptyMonitoringView(
-            onAddFarm: () => context.go('/farms'),
+              onAddFarm: () => context.go('/farms'),
             );
           }
 
@@ -253,7 +253,8 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
-                                  onPressed: () => context.push('/farm/${selectedFarm.id}/scan'),
+                                  onPressed: () => context
+                                      .push('/farm/${selectedFarm.id}/scan'),
                                   icon: const Icon(Icons.refresh),
                                   label: const Text('Reconnect Device'),
                                   style: ElevatedButton.styleFrom(
@@ -720,11 +721,14 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasThingSpeak = farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
-    final thingSpeakAsync = hasThingSpeak ? ref.watch(thingSpeakProvider((
-      channelId: farm.thingSpeakChannelId!,
-      apiKey: farm.thingSpeakReadApiKey!,
-    ) as ({String channelId, String readApiKey}))) : const AsyncValue<ThingSpeakReading>.loading();
+    final hasThingSpeak =
+        farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
+    final thingSpeakAsync = hasThingSpeak
+        ? ref.watch(thingSpeakProvider((
+            channelId: farm.thingSpeakChannelId!,
+            readApiKey: farm.thingSpeakReadApiKey!,
+          )))
+        : const AsyncValue<ThingSpeakReading>.loading();
 
     return Card(
       elevation: 2,
