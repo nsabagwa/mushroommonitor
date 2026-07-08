@@ -283,7 +283,7 @@ class AppSettingsOperations {
         name: 'mushpi.providers.app_state.settings',
       );
 
-      await settingsDao.setValue('notifications_enabled', enabled ? '1' : '0');
+      await settingsDao.setNotificationsEnabled(enabled);
       
       // Refresh provider
       ref.invalidate(notificationsEnabledProvider);
@@ -306,7 +306,7 @@ class AppSettingsOperations {
         name: 'mushpi.providers.app_state.settings',
       );
 
-      await settingsDao.setValue('auto_reconnect', enabled ? '1' : '0');
+      await settingsDao.setAutoReconnect(enabled);
       
       // Refresh provider
       ref.invalidate(autoReconnectEnabledProvider);

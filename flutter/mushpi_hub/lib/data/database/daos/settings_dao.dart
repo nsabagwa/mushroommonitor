@@ -156,7 +156,10 @@ class SettingsDao extends DatabaseAccessor<AppDatabase> with _$SettingsDaoMixin 
 
   /// Get notifications enabled
   Future<bool> getNotificationsEnabled() async {
-    final value = await getValueOrDefault(keyNotificationsEnabled, 'true');
+    final value = await getValueOrDefault(
+      keyNotificationsEnabled,
+      'true');
+
     return value.toLowerCase() == 'true';
   }
 

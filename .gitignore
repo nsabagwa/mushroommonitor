@@ -5,3 +5,5 @@ reports/
 .github/*
 .gitignore
 .saropa/
+
+build/app/outputs

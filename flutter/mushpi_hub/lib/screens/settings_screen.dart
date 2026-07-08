@@ -15,14 +15,14 @@ import '../widgets/theme_selector.dart';
 /// - Data retention settings
 /// - About information
 class SettingsScreen extends ConsumerWidget {
+  static final Uri bugReport = Uri.parse('https://forms.gle/irGv2LqJKqRvGWCV8');
+  static final Uri privacyPolicy = Uri.parse('https://tinyurl.com/yn39ncxh');
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notificationsAsync = ref.watch(notificationsEnabledProvider);
     final autoReconnectAsync = ref.watch(autoReconnectEnabledProvider);
-    final Uri bugReport = Uri.parse('https://forms.gle/irGv2LqJKqRvGWCV8');
-    final Uri privacyPolicy = Uri.parse('https://tinyurl.com/yn39ncxh');
 
     return Scaffold(
       appBar: AppBar(
@@ -65,8 +65,8 @@ class SettingsScreen extends ConsumerWidget {
                     title: const Text('Push Notifications'),
                     subtitle: const Text('Receive alerts and updates'),
                     value: enabled,
-                    onChanged: (value) {
-                      ref
+                    onChanged: (value) async {
+                      await ref
                           .read(appSettingsOperationsProvider)
                           .setNotificationsEnabled(value);
                     },
@@ -98,8 +98,8 @@ class SettingsScreen extends ConsumerWidget {
                     title: const Text('Auto-Reconnect'),
                     subtitle: const Text('Automatically reconnect to devices'),
                     value: enabled,
-                    onChanged: (value) {
-                      ref
+                    onChanged: (value) async {
+                      await ref
                           .read(appSettingsOperationsProvider)
                           .setAutoReconnectEnabled(value);
                     },
@@ -136,11 +136,13 @@ class SettingsScreen extends ConsumerWidget {
                   title: const Text('Report Bug'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () async {
-                    if (await launchUrl(bugReport)) {
-                      await launchUrl(bugReport);
-                    } else {
-                      debugPrint("Could not launch $bugReport");
-                    }
+                    final success = await launchUrl(
+                      bugReport,
+                      mode: LaunchMode.externalApplication);
+
+                      if (!success) {
+                        debugPrint("Could not launch $bugReport");
+                      }
                   },
                 ),
                 const Divider(height: 1),
@@ -149,9 +151,12 @@ class SettingsScreen extends ConsumerWidget {
                   title: const Text('Privacy Policy'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () async {
-                    if (await launchUrl(privacyPolicy)) {
-                      await launchUrl(privacyPolicy);
-                    } else {
+                    final success = await launchUrl(
+                      privacyPolicy,
+                      mode: LaunchMode.externalApplication,
+                    );
+
+                    if (!success) {
                       debugPrint("Could not launch $privacyPolicy");
                     }
                   },

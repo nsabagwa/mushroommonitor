@@ -19,13 +19,16 @@
     <!-- Internet permission for potential cloud sync -->
     <uses-permission android:name="android.permission.INTERNET" />
     
-    <!-- Declare Bluetooth feature (optional, but recommended) -->
+    <!-- Declare Bluetooth features (optional, but recommended) -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+
+    <!-- Notifications Permissions-->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     
     <application
         android:label="mushpi_hub"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@drawable/leaf">
         <activity
             android:name=".MainActivity"
             android:exported="true"
