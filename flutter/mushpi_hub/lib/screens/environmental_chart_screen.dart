@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'dart:developer' as developer;
+import 'dart:math' as math;
 
 import '../data/database/app_database.dart';
 import '../providers/readings_provider.dart';
@@ -566,19 +567,36 @@ class _ChartCardState extends State<_ChartCard> {
             // Horizontal scrollable chart
             SizedBox(
               height: 200,
-              child: GestureDetector(
-                onHorizontalDragUpdate: (details) {
-                  setState(() {
-                    // Pan the chart
-                    final sensitivity =
-                        _visibleWindowMs / 200; // Adjust sensitivity
-                    _scrollOffset -= details.delta.dx * sensitivity;
-                    _scrollOffset = _scrollOffset.clamp(0.0, maxScrollOffset);
-                  });
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Pick how many time-axis labels to show based on the
+                  // actual rendered width, so labels never sit closer than
+                  // ~64px apart. On narrow (mobile) screens this naturally
+                  // reduces the label count; on wide (web) screens it stays
+                  // at the same 5-6 labels as before.
+                  const minLabelSpacingPx = 64.0;
+                  final maxLabels = (constraints.maxWidth / minLabelSpacingPx)
+                      .floor()
+                      .clamp(2, 6);
+                  final bottomInterval = _visibleWindowMs / maxLabels;
+
+                  return GestureDetector(
+                    onHorizontalDragUpdate: (details) {
+                      setState(() {
+                        // Pan the chart
+                        final sensitivity =
+                            _visibleWindowMs / 200; // Adjust sensitivity
+                        _scrollOffset -= details.delta.dx * sensitivity;
+                        _scrollOffset =
+                            _scrollOffset.clamp(0.0, maxScrollOffset);
+                      });
+                    },
+                    child: LineChart(
+                      _buildChartData(
+                          context, minTime, maxTime, bottomInterval),
+                    ),
+                  );
                 },
-                child: LineChart(
-                  _buildChartData(context, minTime, maxTime),
-                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -670,9 +688,16 @@ class _ChartCardState extends State<_ChartCard> {
   /// roughly 80%+ of the chart's vertical space, similar to ThingSpeak's
   /// auto-scaling behaviour, instead of using a fixed min/max range that
   /// can leave sparse-range data (e.g. Light) squeezed into a sliver.
-  (double, double) _computeYAxisBounds(List<FlSpot> spotsInView) {
+  ///
+  /// Also returns a "nice" (1/2/5 x 10^n) interval and snaps min/max to
+  /// multiples of it. Without this, an interval-based gridline can land
+  /// a fraction of a unit away from the axis boundary, causing its label
+  /// to render almost exactly on top of the boundary's own label (the
+  /// "64 / 63" overlap seen at the top of the chart).
+  (double, double, double) _computeYAxisBounds(List<FlSpot> spotsInView) {
     if (spotsInView.isEmpty) {
-      return (widget.minValue, widget.maxValue);
+      final interval = _niceInterval((widget.maxValue - widget.minValue) / 4);
+      return (widget.minValue, widget.maxValue, interval);
     }
 
     var dataMin = spotsInView.first.y;
@@ -699,9 +724,40 @@ class _ChartCardState extends State<_ChartCard> {
 
     // Sensor quantities here (temp/humidity/CO2/light) are never negative;
     // avoid padding below zero when the data itself never goes negative.
-    if (dataMin >= 0 && minY < 0) minY = 0;
+    final allowNegative = dataMin < 0;
+    if (!allowNegative && minY < 0) minY = 0;
 
-    return (minY, maxY);
+    // Snap to a nice interval so gridlines/labels land on clean numbers
+    // and the last tick coincides with the axis edge instead of sitting
+    // a hair's breadth away from it.
+    final interval = _niceInterval((maxY - minY) / 4);
+    minY = (minY / interval).floorToDouble() * interval;
+    maxY = (maxY / interval).ceilToDouble() * interval;
+    if (!allowNegative && minY < 0) minY = 0;
+    if (maxY - minY < interval) maxY = minY + interval;
+
+    return (minY, maxY, interval);
+  }
+
+  /// Rounds a raw axis interval up to the nearest "nice" step (1, 2, or 5
+  /// times a power of 10), the same approach most charting libraries use
+  /// to avoid ugly/colliding tick values.
+  double _niceInterval(double rawInterval) {
+    if (rawInterval <= 0) return 1.0;
+    final exponent = (math.log(rawInterval) / math.ln10).floor();
+    final magnitude = math.pow(10, exponent).toDouble();
+    final residual = rawInterval / magnitude;
+    double niceResidual;
+    if (residual <= 1.0) {
+      niceResidual = 1.0;
+    } else if (residual <= 2.0) {
+      niceResidual = 2.0;
+    } else if (residual <= 5.0) {
+      niceResidual = 5.0;
+    } else {
+      niceResidual = 10.0;
+    }
+    return niceResidual * magnitude;
   }
 
   String _getDataRangeLabel() {
@@ -715,25 +771,35 @@ class _ChartCardState extends State<_ChartCard> {
     return 'Data: ${dataMin.toStringAsFixed(1)} - ${dataMax.toStringAsFixed(1)}';
   }
 
-  LineChartData _buildChartData(
-      BuildContext context, double minTime, double maxTime) {
+  LineChartData _buildChartData(BuildContext context, double minTime,
+      double maxTime, double bottomInterval) {
     final visibleMinX = _scrollOffset;
     final visibleMaxX = _scrollOffset + _visibleWindowMs;
 
     final visibleSpots = widget.spots
         .where((s) => s.x >= visibleMinX && s.x <= visibleMaxX)
         .toList();
-    final (minY, maxY) = _computeYAxisBounds(
+    final (minY, maxY, yInterval) = _computeYAxisBounds(
       visibleSpots.isNotEmpty ? visibleSpots : widget.spots,
     );
-    final yRange = maxY - minY;
+
+    // Tracks the x-value (ms) of the last bottom-axis label actually
+    // rendered during this chart build, so we can suppress any tick that
+    // lands too close to it. fl_chart generates ticks by stepping from a
+    // rounded starting point at `bottomInterval` spacing rather than
+    // anchoring on maxX/"now", so the final tick nearest the current time
+    // can fall closer to its neighbor than minLabelSpacingPx guarantees -
+    // this is what was causing the overlapping/doubled label at the right
+    // edge. Declared here (fresh on every _buildChartData call) so it
+    // resets on every rebuild/zoom/pan instead of leaking state.
+    double? lastRenderedLabelX;
 
     return LineChartData(
       clipData: const FlClipData.all(),
       gridData: FlGridData(
         show: true,
         drawVerticalLine: true,
-        horizontalInterval: yRange / 4,
+        horizontalInterval: yInterval,
         verticalInterval: _visibleWindowMs / 6, // Show ~6 vertical grid lines
         getDrawingHorizontalLine: (value) {
           return FlLine(
@@ -760,7 +826,7 @@ class _ChartCardState extends State<_ChartCard> {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 40,
-            interval: yRange / 4,
+            interval: yInterval,
             getTitlesWidget: (value, meta) {
               return Text(
                 value.toStringAsFixed(0),
@@ -778,21 +844,49 @@ class _ChartCardState extends State<_ChartCard> {
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: 30,
-            interval: _visibleWindowMs / 4, // Show 4-5 time labels
+            // Slightly taller reserved area to make room for the tilted
+            // labels below (they take up a bit more vertical space than
+            // flat horizontal text).
+            reservedSize: 38,
+            interval: bottomInterval, // Responsive - avoids label collision
             getTitlesWidget: (value, meta) {
+              // Skip this tick entirely if it would land too close to the
+              // previously rendered label. This is what actually fixes the
+              // collision at the right edge: fl_chart's automatic tick
+              // generation doesn't guarantee the final tick (nearest "now")
+              // is a full `bottomInterval` away from its neighbor, so
+              // without this check the last two labels can render on top
+              // of each other right at the chart border.
+              final minSpacingMs = bottomInterval * 0.6;
+              if (lastRenderedLabelX != null &&
+                  (value - lastRenderedLabelX!).abs() < minSpacingMs) {
+                return const SizedBox.shrink();
+              }
+              lastRenderedLabelX = value;
+
               final dateTime =
                   DateTime.fromMillisecondsSinceEpoch(value.toInt());
               final timeFormat = _visibleWindowMs > 12 * 60 * 60 * 1000
                   ? DateFormat('MMM dd HH:mm') // Show date if > 12 hours
                   : DateFormat('HH:mm'); // Just time if <= 12 hours
+
+              // Tilt the label so consecutive/edge labels no longer collide
+              // or get visually clipped against the chart border (e.g. the
+              // rightmost "now" label overlapping the axis edge). Rotating
+              // around the top-right corner makes the label swing up and
+              // to the left as it tilts, away from the right border, while
+              // still reading naturally left-to-right.
               return Padding(
                 padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  timeFormat.format(dateTime),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontSize: 10,
-                      ),
+                child: Transform.rotate(
+                  angle: -0.45, // ~-26 degrees
+                  alignment: Alignment.topRight,
+                  child: Text(
+                    timeFormat.format(dateTime),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 10,
+                        ),
+                  ),
                 ),
               );
             },
