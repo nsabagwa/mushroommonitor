@@ -311,12 +311,16 @@ class _FarmHeader extends StatelessWidget {
                 children: [
                   Text(
                     farmName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                   ),
                   Text(
                     timeRange,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -324,6 +328,7 @@ class _FarmHeader extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Icon(
               Icons.show_chart,
               color: Theme.of(context).colorScheme.secondary,
@@ -361,17 +366,23 @@ class _DataSummary extends StatelessWidget {
                   color: Theme.of(context).colorScheme.tertiary,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  '${readings.length} Data Points',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                Flexible(
+                  child: Text(
+                    '${readings.length} Data Points',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
               '${timeFormat.format(earliest)} → ${timeFormat.format(latest)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -482,6 +493,16 @@ class _ChartCardState extends State<_ChartCard> {
     final maxTime = widget.spots.last.x;
     final totalDuration = maxTime - minTime;
 
+    // Recompute bounds every build (not just during pan/zoom gestures).
+    // New readings can shrink `maxTime` if the latest sample gets filtered
+    // out by _createSpots (out-of-range value), which would otherwise leave
+    // a stale _scrollOffset greater than the new Slider max and crash.
+    final maxScrollOffset =
+        (maxTime - _visibleWindowMs).clamp(0.0, double.infinity);
+    if (_scrollOffset > maxScrollOffset) {
+      _scrollOffset = maxScrollOffset;
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -498,28 +519,43 @@ class _ChartCardState extends State<_ChartCard> {
                   icon: const Icon(Icons.zoom_out),
                   onPressed: () {
                     setState(() {
-                      // Increase visible window (zoom out)
-                      _visibleWindowMs = (_visibleWindowMs * 1.5).clamp(
-                        _defaultWindowMs,
-                        totalDuration,
-                      );
+                      // Increase visible window (zoom out). Guard against
+                      // totalDuration being shorter than _defaultWindowMs
+                      // (e.g. sparse data), which would otherwise make the
+                      // clamp's upperLimit < lowerLimit and throw.
+                      final lowerBound = _defaultWindowMs;
+                      final upperBound = totalDuration > lowerBound
+                          ? totalDuration
+                          : lowerBound;
+                      _visibleWindowMs = (_visibleWindowMs * 1.5)
+                          .clamp(lowerBound, upperBound);
                     });
                   },
                   tooltip: 'Zoom Out',
                 ),
-                Text(
-                  _getTimeRangeLabel(),
-                  style: Theme.of(context).textTheme.bodySmall,
+                Flexible(
+                  child: Text(
+                    _getTimeRangeLabel(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.zoom_in),
                   onPressed: () {
                     setState(() {
-                      // Decrease visible window (zoom in)
-                      _visibleWindowMs = (_visibleWindowMs / 1.5).clamp(
-                        60 * 60 * 1000, // Minimum 1 hour
-                        totalDuration,
-                      );
+                      // Decrease visible window (zoom in). Same guard as
+                      // zoom out: upperLimit must never be less than
+                      // lowerLimit or clamp() throws.
+                      const double lowerBound =
+                          60 * 60 * 1000; // Minimum 1 hour
+                      final upperBound = totalDuration > lowerBound
+                          ? totalDuration
+                          : lowerBound;
+                      _visibleWindowMs = (_visibleWindowMs / 1.5)
+                          .clamp(lowerBound, upperBound);
                     });
                   },
                   tooltip: 'Zoom In',
@@ -537,10 +573,7 @@ class _ChartCardState extends State<_ChartCard> {
                     final sensitivity =
                         _visibleWindowMs / 200; // Adjust sensitivity
                     _scrollOffset -= details.delta.dx * sensitivity;
-                    _scrollOffset = _scrollOffset.clamp(
-                      0.0,
-                      (maxTime - _visibleWindowMs).clamp(0, double.infinity),
-                    );
+                    _scrollOffset = _scrollOffset.clamp(0.0, maxScrollOffset);
                   });
                 },
                 child: LineChart(
@@ -554,7 +587,7 @@ class _ChartCardState extends State<_ChartCard> {
               Slider(
                 value: _scrollOffset,
                 min: 0,
-                max: (maxTime - _visibleWindowMs).clamp(0, double.infinity),
+                max: maxScrollOffset,
                 onChanged: (value) {
                   setState(() {
                     _scrollOffset = value;
@@ -591,34 +624,84 @@ class _ChartCardState extends State<_ChartCard> {
 
   Widget _buildHeader(BuildContext context, double avgValue) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Icon(widget.icon, color: widget.color),
         const SizedBox(width: 8),
-        Text(
-          widget.title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+        Flexible(
+          child: Text(
+            widget.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
         ),
-        const Spacer(),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              'Avg: ${avgValue.toStringAsFixed(1)} ${widget.unit}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            // Show data range instead of fixed Y-axis range
-            Text(
-              _getDataRangeLabel(),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
+        const SizedBox(width: 8),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Avg: ${avgValue.toStringAsFixed(1)} ${widget.unit}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              // Show data range instead of fixed Y-axis range
+              Text(
+                _getDataRangeLabel(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
         ),
       ],
     );
+  }
+
+  /// Computes Y-axis bounds from the given spots so the plotted line fills
+  /// roughly 80%+ of the chart's vertical space, similar to ThingSpeak's
+  /// auto-scaling behaviour, instead of using a fixed min/max range that
+  /// can leave sparse-range data (e.g. Light) squeezed into a sliver.
+  (double, double) _computeYAxisBounds(List<FlSpot> spotsInView) {
+    if (spotsInView.isEmpty) {
+      return (widget.minValue, widget.maxValue);
+    }
+
+    var dataMin = spotsInView.first.y;
+    var dataMax = spotsInView.first.y;
+    for (final s in spotsInView) {
+      if (s.y < dataMin) dataMin = s.y;
+      if (s.y > dataMax) dataMax = s.y;
+    }
+
+    var range = dataMax - dataMin;
+    if (range <= 0) {
+      // Flat line (all same value) - fabricate a small range so the axis
+      // isn't degenerate.
+      final fallback = dataMax.abs() * 0.1;
+      range = fallback > 0 ? fallback : 1.0;
+      dataMin -= range / 2;
+      dataMax += range / 2;
+    }
+
+    // 10% padding on each side => data occupies ~1/1.2 ≈ 83% of the height.
+    final padding = range * 0.1;
+    var minY = dataMin - padding;
+    var maxY = dataMax + padding;
+
+    // Sensor quantities here (temp/humidity/CO2/light) are never negative;
+    // avoid padding below zero when the data itself never goes negative.
+    if (dataMin >= 0 && minY < 0) minY = 0;
+
+    return (minY, maxY);
   }
 
   String _getDataRangeLabel() {
@@ -637,12 +720,20 @@ class _ChartCardState extends State<_ChartCard> {
     final visibleMinX = _scrollOffset;
     final visibleMaxX = _scrollOffset + _visibleWindowMs;
 
+    final visibleSpots = widget.spots
+        .where((s) => s.x >= visibleMinX && s.x <= visibleMaxX)
+        .toList();
+    final (minY, maxY) = _computeYAxisBounds(
+      visibleSpots.isNotEmpty ? visibleSpots : widget.spots,
+    );
+    final yRange = maxY - minY;
+
     return LineChartData(
       clipData: const FlClipData.all(),
       gridData: FlGridData(
         show: true,
         drawVerticalLine: true,
-        horizontalInterval: (widget.maxValue - widget.minValue) / 4,
+        horizontalInterval: yRange / 4,
         verticalInterval: _visibleWindowMs / 6, // Show ~6 vertical grid lines
         getDrawingHorizontalLine: (value) {
           return FlLine(
@@ -669,7 +760,7 @@ class _ChartCardState extends State<_ChartCard> {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 40,
-            interval: (widget.maxValue - widget.minValue) / 4,
+            interval: yRange / 4,
             getTitlesWidget: (value, meta) {
               return Text(
                 value.toStringAsFixed(0),
@@ -731,9 +822,10 @@ class _ChartCardState extends State<_ChartCard> {
       ),
       minX: visibleMinX,
       maxX: visibleMaxX,
-      // Use fixed Y-axis range without padding
-      minY: widget.minValue,
-      maxY: widget.maxValue,
+      // Auto-scaled Y-axis: fills ~80%+ of the chart height around the
+      // data currently in view, ThingSpeak-style, instead of a fixed range.
+      minY: minY,
+      maxY: maxY,
       lineBarsData: [
         LineChartBarData(
           spots: widget.spots,
@@ -795,7 +887,11 @@ class _ChartCardState extends State<_ChartCard> {
 }
 
 /// Helper function to create FlSpot list from readings with timestamp-based x-axis
-/// Filters out zero, negative values, and values exceeding max
+/// Filters out zero/negative values (sensor error reads). Upper/lower
+/// "normal" bounds (minValue/maxValue) are no longer used to drop points -
+/// the chart's Y-axis now scales dynamically to whatever data is present,
+/// so a legitimate reading outside the old fixed display range (e.g. a low
+/// Light value) is kept and simply reflected in the auto-scaled axis.
 List<FlSpot> _createSpots(
   List<Reading> readings,
   double Function(Reading) getValue,
@@ -805,8 +901,9 @@ List<FlSpot> _createSpots(
   return readings
       .map((reading) {
         final value = getValue(reading);
-        // Filter out zero, negative values, and values exceeding max
-        if (value <= 0 || value > maxValue || value < minValue) return null;
+        // Filter out zero/negative values only - these indicate a sensor
+        // error/dropout rather than a real (if unusually low) reading.
+        if (value <= 0) return null;
         // Use milliseconds since epoch as x-value to show accurate time gaps
         return FlSpot(
           reading.timestamp.millisecondsSinceEpoch.toDouble(),
