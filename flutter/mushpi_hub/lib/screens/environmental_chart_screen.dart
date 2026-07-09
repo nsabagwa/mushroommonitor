@@ -461,7 +461,12 @@ class _ChartCard extends StatefulWidget {
 }
 
 class _ChartCardState extends State<_ChartCard> {
-  // Scroll position (in milliseconds)
+  // Scroll position, as an ABSOLUTE epoch-millisecond value (this is used
+  // directly as the chart's minX in _buildChartData, and directly as the
+  // Slider's value below) - NOT a relative offset from the earliest
+  // reading. This distinction matters: past bugs here came from treating
+  // it as relative in one place while every other place treated it as
+  // absolute.
   double _scrollOffset = 0;
 
   // Visible window size (in milliseconds) - default to 6 hours
@@ -473,9 +478,14 @@ class _ChartCardState extends State<_ChartCard> {
     super.initState();
     // Start by showing the most recent data
     if (widget.spots.isNotEmpty) {
+      final earliestTime = widget.spots.first.x;
       final latestTime = widget.spots.last.x;
       _scrollOffset = latestTime - _visibleWindowMs;
-      if (_scrollOffset < 0) _scrollOffset = 0;
+      // Lower bound must be the first reading's timestamp, NOT 0 (epoch,
+      // i.e. the year 1970). Clamping to 0 here rarely mattered for this
+      // particular initial value, but the same wrong lower bound is what
+      // broke the Slider elsewhere - see the bounds below.
+      if (_scrollOffset < earliestTime) _scrollOffset = earliestTime;
     }
   }
 
@@ -499,9 +509,19 @@ class _ChartCardState extends State<_ChartCard> {
     // out by _createSpots (out-of-range value), which would otherwise leave
     // a stale _scrollOffset greater than the new Slider max and crash.
     final maxScrollOffset =
-        (maxTime - _visibleWindowMs).clamp(0.0, double.infinity);
+        (maxTime - _visibleWindowMs).clamp(minTime, double.infinity);
     if (_scrollOffset > maxScrollOffset) {
       _scrollOffset = maxScrollOffset;
+    }
+    // FIX: the lower bound must be minTime, not 0/epoch. _scrollOffset is
+    // an absolute epoch-ms value, so a Slider with `min: 0` mapped most of
+    // its track to a time window from 1970 up to just before your real
+    // data - i.e. a window with no points in it. That's why dragging the
+    // Slider showed a blank chart, while panning looked fine (a drag
+    // gesture can never realistically travel far enough to get anywhere
+    // near epoch 0, so it stayed within the real data range by accident).
+    if (_scrollOffset < minTime) {
+      _scrollOffset = minTime;
     }
 
     return Card(
@@ -587,8 +607,12 @@ class _ChartCardState extends State<_ChartCard> {
                         final sensitivity =
                             _visibleWindowMs / 200; // Adjust sensitivity
                         _scrollOffset -= details.delta.dx * sensitivity;
+                        // FIX: lower bound is minTime, not 0 - see notes
+                        // above. Previously this only "worked" because a
+                        // drag gesture can't physically travel far enough
+                        // to reach epoch 0.
                         _scrollOffset =
-                            _scrollOffset.clamp(0.0, maxScrollOffset);
+                            _scrollOffset.clamp(minTime, maxScrollOffset);
                       });
                     },
                     child: LineChart(
@@ -604,14 +628,20 @@ class _ChartCardState extends State<_ChartCard> {
             if (totalDuration > _visibleWindowMs)
               Slider(
                 value: _scrollOffset,
-                min: 0,
+                // FIX: was `min: 0` (epoch/1970). _scrollOffset is an
+                // absolute epoch-ms value, so the Slider's minimum must be
+                // minTime (the earliest reading) - otherwise almost the
+                // entire track corresponds to a time window with no data
+                // in it at all, which is why dragging the slider showed a
+                // blank chart.
+                min: minTime,
                 max: maxScrollOffset,
                 onChanged: (value) {
                   setState(() {
                     _scrollOffset = value;
                   });
                 },
-                label: _getScrollPositionLabel(minTime),
+                label: _getScrollPositionLabel(),
               ),
           ],
         ),
@@ -973,9 +1003,14 @@ class _ChartCardState extends State<_ChartCard> {
     }
   }
 
-  String _getScrollPositionLabel(double minTime) {
+  /// FIX: _scrollOffset is already an ABSOLUTE epoch-ms value (see the
+  /// field doc comment above), so it must be converted to a DateTime
+  /// directly. The previous version added `minTime` to it again
+  /// (`_scrollOffset + minTime`), which double-counted the offset and
+  /// showed the wrong time in the Slider's drag label.
+  String _getScrollPositionLabel() {
     final currentTime =
-        DateTime.fromMillisecondsSinceEpoch((_scrollOffset + minTime).toInt());
+        DateTime.fromMillisecondsSinceEpoch(_scrollOffset.toInt());
     return DateFormat('MMM dd, HH:mm').format(currentTime);
   }
 }
