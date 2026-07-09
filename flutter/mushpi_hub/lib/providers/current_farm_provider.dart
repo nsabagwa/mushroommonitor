@@ -7,6 +7,7 @@ import 'package:mushpi_hub/data/repositories/farm_repository.dart';
 import 'package:mushpi_hub/providers/database_provider.dart';
 import 'package:mushpi_hub/providers/farms_provider.dart';
 import 'package:mushpi_hub/data/repositories/thingspeak_repository.dart';
+import 'package:mushpi_hub/data/config/thingspeak_config.dart';
 import 'dart:developer' as developer;
 import 'dart:async';
 
@@ -39,6 +40,7 @@ final selectedMonitoringFarmIdProvider = StateProvider<String?>((ref) => null);
 /// );
 /// ```
 final selectedMonitoringFarmLatestReadingProvider =
+    // ignore: use_function_type_syntax_for_parameters, avoid_types_as_parameter_names
     FutureProvider<EnvironmentalReading?>((ref) async {
   final farmId = ref.watch(selectedMonitoringFarmIdProvider);
   
@@ -48,7 +50,6 @@ final selectedMonitoringFarmLatestReadingProvider =
 
   final readingsDao = ref.watch(readingsDaoProvider);
   final farm = await ref.watch(farmByIdProvider(farmId).future);
-  final tsRepo = ThingSpeakRepository();
   
   // Check if farm is online (BLE connected) - lastActive within 1 minute
   final isBleConnected = farm?.lastActive != null &&
@@ -81,8 +82,17 @@ final selectedMonitoringFarmLatestReadingProvider =
       return null;
     }
   } else {
+    ThingSpeakRepository? tsRepo;
+
+    if (farm?.thingSpeakChannelId != null && farm?.thingSpeakReadApiKey != null) {
+      final tsConfig = ThingSpeakConfig.defaultsFromEnv().withFarmCredentials(
+        channelId: farm!.thingSpeakChannelId!,
+        readApiKey: farm.thingSpeakReadApiKey!,
+      );
+      tsRepo = ThingSpeakRepository(config: tsConfig);
+    }
     // If not BLE connected, try ThingSpeak if enabled
-    if (tsRepo.isEnabled) {
+    if (tsRepo != null && tsRepo.isEnabled) {
       try {
         // First try local DB
         final localReading = await readingsDao.getLatestReadingByFarm(farmId);

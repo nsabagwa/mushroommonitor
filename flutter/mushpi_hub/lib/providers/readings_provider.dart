@@ -1,11 +1,14 @@
 // lib/providers/readings_provider.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mushpi_hub/data/config/thingspeak_config.dart';
 import 'package:mushpi_hub/data/database/app_database.dart';
 import 'package:mushpi_hub/data/repositories/thingspeak_repository.dart';
 import 'package:mushpi_hub/providers/database_provider.dart';
 import 'package:mushpi_hub/providers/current_farm_provider.dart';
 import 'dart:developer' as developer;
+
+import 'package:mushpi_hub/providers/farms_provider.dart';
 
 /// Provider for fetching readings from the last 24 hours for the selected farm.
 ///
@@ -49,29 +52,41 @@ final last24HoursReadingsProvider = FutureProvider<List<Reading>>((ref) async {
       now,
     );
 
-    developer.log(
-      'Fetched ${localReadings.length} readings from local DB for last 24 hours',
-      name: 'mushpi.providers.readings',
-    );
+    print('LOCAL READINGS!!! ${localReadings.length}');
 
     // Attempt to backfill gaps from ThingSpeak if configured.
     // If integration is disabled or fails, we simply return local readings.
-    final tsRepo = ThingSpeakRepository();
+    final farm = await ref.watch(farmByIdProvider(selectedFarmId).future);
+
+    print('FARM!!! ${farm?.thingSpeakChannelId}');
+    
+    if (farm?.thingSpeakChannelId == null || farm?.thingSpeakReadApiKey == null) {
+      return localReadings;
+    }
+
+    print("EXITING: No Farm Credentials");
+
+    final tsConfig = ThingSpeakConfig.defaultsFromEnv().withFarmCredentials(
+      channelId: farm!.thingSpeakChannelId!,
+      readApiKey: farm.thingSpeakReadApiKey!,
+    );
+
+    final tsRepo = ThingSpeakRepository(config: tsConfig);
+    print("TS REPO IS ENABLED!: ${tsRepo.isEnabled}");
 
     if (!tsRepo.isEnabled) {
       return localReadings;
     }
-
-    developer.log(
-      'Attempting ThingSpeak backfill for farm $selectedFarmId (last 24 hours)',
-      name: 'mushpi.providers.readings',
-    );
+    
+    print('CALLING READINGS FOR PERIOD...');
 
     final remoteReadings = await tsRepo.fetchReadingsForPeriod(
       farmId: selectedFarmId,
       start: twentyFourHoursAgo,
       end: now,
     );
+
+    print('REMOTE READINGS!!! ${remoteReadings.length}');
 
     // If no remote data available, return local only (which may be empty)
     if (remoteReadings.isEmpty) {
@@ -163,7 +178,17 @@ final readingsByPeriodProvider = FutureProvider.family<
     );
 
     // Attempt to backfill gaps from ThingSpeak if configured.
-    final tsRepo = ThingSpeakRepository();
+    final farm = await ref.watch(farmByIdProvider(params.farmId).future);
+
+    if (farm?.thingSpeakChannelId == null || farm?.thingSpeakReadApiKey == null) {
+      return localReadings;
+    }
+
+    final tsConfig = ThingSpeakConfig.defaultsFromEnv().withFarmCredentials(
+      channelId: farm!.thingSpeakChannelId!,
+      readApiKey: farm.thingSpeakReadApiKey!,
+    );
+    final tsRepo = ThingSpeakRepository(config: tsConfig);
 
     if (!tsRepo.isEnabled) {
       return localReadings;
@@ -202,6 +227,7 @@ final readingsByPeriodProvider = FutureProvider.family<
     final merged = <Reading>[];
     merged.addAll(localReadings);
 
+    print('FIELD MAPPINGS: TEMP=${tsConfig.fieldTemperature} HUM=${tsConfig.fieldHumidity} CO2=${tsConfig.fieldCo2} LIGHT=${tsConfig.fieldLight}');
     for (final remote in remoteReadings) {
       final hasNearbyLocal = localReadings.any((local) {
         final diff = local.timestamp.difference(remote.timestamp).abs();

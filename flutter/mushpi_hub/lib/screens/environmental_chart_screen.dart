@@ -35,6 +35,7 @@ class _EnvironmentalChartScreenState
 
   @override
   Widget build(BuildContext context) {
+    print("CHART SCREEN BUILD CALLED!!!!");
     final selectedFarmId = ref.watch(selectedMonitoringFarmIdProvider);
     final farmsAsync = ref.watch(activeFarmsProvider);
 
@@ -149,8 +150,8 @@ class _EnvironmentalChartScreenState
                         unit: '°C',
                         icon: Icons.thermostat,
                         color: Colors.orange,
-                        minValue: 15.0,
-                        maxValue: 35.0,
+                        minValue: 0.0,
+                        maxValue: 50.0,
                         getValue: (r) => r.temperatureC,
                       ),
                       const SizedBox(height: 24),
@@ -160,8 +161,8 @@ class _EnvironmentalChartScreenState
                         unit: '%',
                         icon: Icons.water_drop,
                         color: Colors.blue,
-                        minValue: 70.0,
-                        maxValue: 110.0,
+                        minValue: 0.0,
+                        maxValue: 100.0,
                         getValue: (r) => r.relativeHumidity,
                       ),
                       const SizedBox(height: 24),
@@ -171,8 +172,8 @@ class _EnvironmentalChartScreenState
                         unit: 'ppm',
                         icon: Icons.air,
                         color: Colors.green,
-                        minValue: 300.0,
-                        maxValue: 4000.0,
+                        minValue: 0.0,
+                        maxValue: 5000.0,
                         getValue: (r) => r.co2Ppm.toDouble(),
                       ),
                       const SizedBox(height: 24),
@@ -182,8 +183,8 @@ class _EnvironmentalChartScreenState
                         unit: 'raw',
                         icon: Icons.light_mode,
                         color: Colors.amber,
-                        minValue: 100.0,
-                        maxValue: 600.0,
+                        minValue: 0.0,
+                        maxValue: 200.0,
                         getValue: (r) => r.lightRaw.toDouble(),
                       ),
                       const SizedBox(height: 80), // Bottom padding
@@ -503,6 +504,9 @@ class _ChartCardState extends State<_ChartCard> {
                         _defaultWindowMs,
                         totalDuration,
                       );
+                      // Re-clamp scroll offset to fit the new window
+                      final maxOffset = (maxTime - _visibleWindowMs).clamp(minTime, double.infinity);
+                      _scrollOffset = _scrollOffset.clamp(minTime, maxOffset);
                     });
                   },
                   tooltip: 'Zoom Out',
@@ -520,6 +524,9 @@ class _ChartCardState extends State<_ChartCard> {
                         60 * 60 * 1000, // Minimum 1 hour
                         totalDuration,
                       );
+                      // Re-clamp scroll offset to fit the new window
+                      final maxOffset = (maxTime - _visibleWindowMs).clamp(minTime, double.infinity);
+                      _scrollOffset = _scrollOffset.clamp(minTime, maxOffset);
                     });
                   },
                   tooltip: 'Zoom In',
@@ -538,8 +545,8 @@ class _ChartCardState extends State<_ChartCard> {
                         _visibleWindowMs / 200; // Adjust sensitivity
                     _scrollOffset -= details.delta.dx * sensitivity;
                     _scrollOffset = _scrollOffset.clamp(
-                      0.0,
-                      (maxTime - _visibleWindowMs).clamp(0, double.infinity),
+                      minTime,
+                      (maxTime - _visibleWindowMs).clamp(minTime, double.infinity),
                     );
                   });
                 },
@@ -553,8 +560,8 @@ class _ChartCardState extends State<_ChartCard> {
             if (totalDuration > _visibleWindowMs)
               Slider(
                 value: _scrollOffset,
-                min: 0,
-                max: (maxTime - _visibleWindowMs).clamp(0, double.infinity),
+                min: minTime,
+                max: (maxTime - _visibleWindowMs).clamp(minTime, double.infinity),
                 onChanged: (value) {
                   setState(() {
                     _scrollOffset = value;
@@ -638,6 +645,7 @@ class _ChartCardState extends State<_ChartCard> {
     final visibleMaxX = _scrollOffset + _visibleWindowMs;
 
     return LineChartData(
+      clipData: const FlClipData.all(),
       gridData: FlGridData(
         show: true,
         drawVerticalLine: true,

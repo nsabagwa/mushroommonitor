@@ -11,8 +11,8 @@ import 'package:intl/intl.dart';
 /// has gaps (e.g., phone was offline) but the Pi successfully pushed data
 /// to ThingSpeak.
 class ThingSpeakRepository {
-  ThingSpeakRepository({ThingSpeakConfig? config})
-      : _config = config ?? ThingSpeakConfig.fromEnv();
+  ThingSpeakRepository({required ThingSpeakConfig config})
+      : _config = config;
 
   final ThingSpeakConfig _config;
 
@@ -31,7 +31,7 @@ class ThingSpeakRepository {
     if (!isEnabled) {
       return const [];
     }
-
+    print("FETCHING URI CHANNEL: ${_config.channelId}");
     try {
       final uri = Uri.parse(
         '${_config.baseUrl}/${_config.channelId}/feeds.json',
@@ -43,12 +43,14 @@ class ThingSpeakRepository {
           'end': DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(end.toUtc()),
         },
       );
-
+      print('FULL URI: $uri');
       final response = await http.get(uri);
       if (response.statusCode != 200) {
         // Non-200 is treated as "no remote data" to avoid breaking UI.
         return const [];
       }
+      print("STATUS: ${response.statusCode}");
+      print("BODY: ${response.body}");
 
       final decoded = json.decode(response.body) as Map<String, dynamic>;
       final feeds = decoded['feeds'];
@@ -86,7 +88,7 @@ class ThingSpeakRepository {
         final temp = double.tryParse(tempStr);
         final rh = double.tryParse(rhStr);
         final co2 = int.tryParse(co2Str);
-        final light = int.tryParse(lightStr);
+        final light = double.tryParse(lightStr);
 
         if (temp == null || rh == null || co2 == null || light == null) {
           continue;
@@ -100,7 +102,7 @@ class ThingSpeakRepository {
             co2Ppm: co2,
             temperatureC: temp,
             relativeHumidity: rh,
-            lightRaw: light,
+            lightRaw: light.round(),
           ),
         );
       }
@@ -169,7 +171,7 @@ class ThingSpeakRepository {
       final temp = double.tryParse(tempStr);
       final rh = double.tryParse(rhStr);
       final co2 = int.tryParse(co2Str);
-      final light = int.tryParse(lightStr);
+      final light = double.tryParse(lightStr);
 
       if (temp == null || rh == null || co2 == null || light == null) {
         return null;
@@ -182,7 +184,7 @@ class ThingSpeakRepository {
         co2Ppm: co2,
         temperatureC: temp,
         relativeHumidity: rh,
-        lightRaw: light,
+        lightRaw: light.round(),
       );
     } catch (_) {
       return null;
@@ -196,5 +198,3 @@ class ThingSpeakRepository {
     return value.toString();
   }
 }
-
-

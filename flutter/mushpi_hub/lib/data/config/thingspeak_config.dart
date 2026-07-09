@@ -5,7 +5,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 /// All values are loaded from the runtime `.env` file via flutter_dotenv.
 /// No hard-coded API keys, channel IDs, or field mappings are used.
 class ThingSpeakConfig {
-  final bool enabled;
   final String readApiKey;
   final String channelId;
   final String baseUrl;
@@ -15,7 +14,6 @@ class ThingSpeakConfig {
   final String fieldLight;
 
   const ThingSpeakConfig({
-    required this.enabled,
     required this.readApiKey,
     required this.channelId,
     required this.baseUrl,
@@ -25,35 +23,22 @@ class ThingSpeakConfig {
     required this.fieldLight,
   });
 
+  bool get hasRequiredCredentials => readApiKey.isNotEmpty && channelId.isNotEmpty;
+
   /// Load configuration from `.env` using flutter_dotenv.
   ///
   /// This intentionally does not provide default API keys or channel IDs;
   /// if required values are missing, the integration will be considered
   /// "effectively disabled" at runtime.
-  static ThingSpeakConfig fromEnv() {
+  static ThingSpeakConfig defaultsFromEnv() {
     final env = dotenv.env;
 
-    bool getBool(String key, bool defaultValue) {
-      final v = env[key];
-      if (v == null) return defaultValue;
-      final lower = v.toLowerCase().trim();
-      return lower == 'true' ||
-          lower == '1' ||
-          lower == 'yes' ||
-          lower == 'on';
-    }
-
-    String getString(String key, [String defaultValue = '']) {
-      final v = env[key];
-      if (v == null) return defaultValue;
-      return v.trim();
-    }
+    String getString(String key, [String defaultValue = '']) => env[key]?.trim() ?? defaultValue;
 
     return ThingSpeakConfig(
-      enabled: getBool('MUSHPI_THINGSPEAK_ENABLED', false),
       // Separate read key so backend can use write key; caller may set them equal.
-      readApiKey: getString('MUSHPI_THINGSPEAK_READ_API_KEY'),
-      channelId: getString('MUSHPI_THINGSPEAK_CHANNEL_ID'),
+      readApiKey: '',
+      channelId: '',
       baseUrl: getString(
         'MUSHPI_THINGSPEAK_BASE_URL',
         'https://api.thingspeak.com/channels',
@@ -65,8 +50,20 @@ class ThingSpeakConfig {
     );
   }
 
-  bool get hasRequiredCredentials =>
-      enabled && readApiKey.isNotEmpty && channelId.isNotEmpty;
+  ThingSpeakConfig withFarmCredentials ({
+    required String channelId,
+    required String readApiKey,
+  }) {
+    return ThingSpeakConfig(
+      readApiKey: readApiKey,
+      channelId: channelId,
+      baseUrl: baseUrl,
+      fieldTemperature: fieldTemperature,
+      fieldHumidity: fieldHumidity,
+      fieldCo2: fieldCo2,
+      fieldLight: fieldLight,
+    );
+  }
 }
 
 
