@@ -489,6 +489,14 @@ class _ChartCardState extends State<_ChartCard> {
     }
   }
 
+  /// True once the user has zoomed in past the default window - this is
+  /// what now drives the Y-axis behaviour instead of a separate manual
+  /// toggle: zoomed in => fit tightly to the data currently in view;
+  /// at/above the default window (i.e. "zoomed out") => use the full
+  /// dataset's range so the axis stays stable and reads as "the whole
+  /// trend".
+  bool get _isZoomedIn => _visibleWindowMs < _defaultWindowMs;
+
   @override
   Widget build(BuildContext context) {
     final avgValue = widget.spots.isEmpty
@@ -714,59 +722,43 @@ class _ChartCardState extends State<_ChartCard> {
     );
   }
 
-  /// Computes Y-axis bounds from the given spots so the plotted line fills
-  /// roughly 80%+ of the chart's vertical space, similar to ThingSpeak's
-  /// auto-scaling behaviour, instead of using a fixed min/max range that
-  /// can leave sparse-range data (e.g. Light) squeezed into a sliver.
+  /// Computes Y-axis bounds from the given spots. The axis always starts
+  /// at zero (as it did before the auto-scaling change), and the top of
+  /// the axis is set so the tallest data point in `spotsInView` fills
+  /// about 80% of the chart's vertical space (maxY = dataMax / 0.8),
+  /// similar to ThingSpeak's auto-scaling behaviour, instead of a fixed
+  /// min/max range that can leave sparse-range data (e.g. Light) squeezed
+  /// into a sliver.
   ///
-  /// Also returns a "nice" (1/2/5 x 10^n) interval and snaps min/max to
-  /// multiples of it. Without this, an interval-based gridline can land
-  /// a fraction of a unit away from the axis boundary, causing its label
-  /// to render almost exactly on top of the boundary's own label (the
+  /// Also returns a "nice" (1/2/5 x 10^n) interval and snaps maxY up to a
+  /// multiple of it. Without this, an interval-based gridline can land a
+  /// fraction of a unit away from the axis boundary, causing its label to
+  /// render almost exactly on top of the boundary's own label (the
   /// "64 / 63" overlap seen at the top of the chart).
   (double, double, double) _computeYAxisBounds(List<FlSpot> spotsInView) {
     if (spotsInView.isEmpty) {
-      final interval = _niceInterval((widget.maxValue - widget.minValue) / 4);
-      return (widget.minValue, widget.maxValue, interval);
+      final interval = _niceInterval(widget.maxValue / 4);
+      return (0.0, widget.maxValue, interval);
     }
 
-    var dataMin = spotsInView.first.y;
     var dataMax = spotsInView.first.y;
     for (final s in spotsInView) {
-      if (s.y < dataMin) dataMin = s.y;
       if (s.y > dataMax) dataMax = s.y;
     }
+    if (dataMax <= 0) dataMax = 1.0;
 
-    var range = dataMax - dataMin;
-    if (range <= 0) {
-      // Flat line (all same value) - fabricate a small range so the axis
-      // isn't degenerate.
-      final fallback = dataMax.abs() * 0.1;
-      range = fallback > 0 ? fallback : 1.0;
-      dataMin -= range / 2;
-      dataMax += range / 2;
-    }
-
-    // 10% padding on each side => data occupies ~1/1.2 ≈ 83% of the height.
-    final padding = range * 0.1;
-    var minY = dataMin - padding;
-    var maxY = dataMax + padding;
-
-    // Sensor quantities here (temp/humidity/CO2/light) are never negative;
-    // avoid padding below zero when the data itself never goes negative.
-    final allowNegative = dataMin < 0;
-    if (!allowNegative && minY < 0) minY = 0;
+    // Axis always starts at 0. To make the data's peak occupy ~80% of the
+    // vertical space, the top of the axis needs to be dataMax / 0.8.
+    var maxY = dataMax / 0.8;
 
     // Snap to a nice interval so gridlines/labels land on clean numbers
-    // and the last tick coincides with the axis edge instead of sitting
-    // a hair's breadth away from it.
-    final interval = _niceInterval((maxY - minY) / 4);
-    minY = (minY / interval).floorToDouble() * interval;
+    // and the top tick coincides with the axis edge instead of sitting a
+    // hair's breadth away from it.
+    final interval = _niceInterval(maxY / 4);
     maxY = (maxY / interval).ceilToDouble() * interval;
-    if (!allowNegative && minY < 0) minY = 0;
-    if (maxY - minY < interval) maxY = minY + interval;
+    if (maxY <= 0) maxY = interval;
 
-    return (minY, maxY, interval);
+    return (0.0, maxY, interval);
   }
 
   /// Rounds a raw axis interval up to the nearest "nice" step (1, 2, or 5
@@ -809,8 +801,17 @@ class _ChartCardState extends State<_ChartCard> {
     final visibleSpots = widget.spots
         .where((s) => s.x >= visibleMinX && s.x <= visibleMaxX)
         .toList();
+
+    // Y-axis bounds: zoomed out (at/above the default window) uses the
+    // FULL dataset so the axis stays stable and reads as "the whole
+    // trend" instead of looking artificially zoomed; zoomed in past the
+    // default window fits tightly to just the spots currently in view, so
+    // the visible data fills ~80% of the chart height. Either way the
+    // axis always starts at 0 (see _computeYAxisBounds).
     final (minY, maxY, yInterval) = _computeYAxisBounds(
-      visibleSpots.isNotEmpty ? visibleSpots : widget.spots,
+      _isZoomedIn
+          ? (visibleSpots.isNotEmpty ? visibleSpots : widget.spots)
+          : widget.spots,
     );
 
     // Tracks the x-value (ms) of the last bottom-axis label actually
@@ -946,8 +947,10 @@ class _ChartCardState extends State<_ChartCard> {
       ),
       minX: visibleMinX,
       maxX: visibleMaxX,
-      // Auto-scaled Y-axis: fills ~80%+ of the chart height around the
-      // data currently in view, ThingSpeak-style, instead of a fixed range.
+      // Y-axis: always starts at 0. Either fixed to the full dataset's
+      // range (stable, "whole chart" feel, when zoomed out) or auto-scaled
+      // to fill ~80% of the visible window's data (when zoomed in),
+      // depending on _isZoomedIn.
       minY: minY,
       maxY: maxY,
       lineBarsData: [
