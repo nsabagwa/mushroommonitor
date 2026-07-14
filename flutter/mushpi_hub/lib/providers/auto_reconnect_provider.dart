@@ -1,5 +1,7 @@
 // lib/providers/auto_reconnect_provider.dart
 
+// ignore_for_file: unused_field
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
