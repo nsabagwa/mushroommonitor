@@ -33,6 +33,8 @@ class WifiDeviceRepository implements DeviceRepository {
   int _port = 80;
   Timer? _pollTimer;
   DeviceConnectionState _state = DeviceConnectionState.disconnected;
+  int _consecutivePollFailures = 0;
+  static const int _pollFailureThreshold = 3;
 
   final _connectionStateController =
       StreamController<DeviceConnectionState>.broadcast();
@@ -101,11 +103,12 @@ class WifiDeviceRepository implements DeviceRepository {
         _statusFlagsController.add(await readStatusFlags());
         final actuator = await readActuatorStatus();
         if (actuator != null) _actuatorStatusController.add(actuator);
+        // Successful poll; reset failure counter.
+        _consecutivePollFailures = 0;
       } catch (e, stackTrace) {
         // Swallow poll errors so one flaky cycle doesn't crash the timer.
         // A device that's genuinely gone stays silent on these streams;
         // callers doing an explicit read/write still get a real failure.
-        // TODO: surface repeated poll failures as a connection-state drop
         // (a "missed N heartbeats -> disconnected" watchdog) once this is
         // running against real hardware instead of mocks.
         developer.log(
@@ -115,6 +118,17 @@ class WifiDeviceRepository implements DeviceRepository {
           stackTrace: stackTrace,
           level: 900,
         );
+        _consecutivePollFailures++;
+        if (_consecutivePollFailures >= _pollFailureThreshold) {
+          developer.log(
+            'Wi-Fi poll failure threshold reached; marking disconnected',
+            name: 'WifiDeviceRepository',
+            level: 900,
+          );
+          _pollTimer?.cancel();
+          _pollTimer = null;
+          _setState(DeviceConnectionState.disconnected);
+        }
       }
     });
   }
@@ -136,8 +150,15 @@ class WifiDeviceRepository implements DeviceRepository {
 
   @override
   Future<EnvironmentalReading> readEnvironmentalData() => _guard(() async {
-        final json = await _get('/environment');
-        return _environmentalReadingFromJson(json);
+        final json = await _get('/api/data');
+        return EnvironmentalReading(
+          co2Ppm: json['co2'] as int,
+          temperatureC: (json['temp'] as num).toDouble(),
+          relativeHumidity: (json['humidity'] as num).toDouble(),
+          lightRaw: (json['lux'] as num).round(),
+          uptimeMs: 0,
+          timestamp: DateTime.now(),
+        );
       });
 
   @override
@@ -160,19 +181,45 @@ class WifiDeviceRepository implements DeviceRepository {
 
   @override
   Future<ActuatorStatusData?> readActuatorStatus() => _guard(() async {
-        final json = await _get('/actuator-status');
+        final json = await _get('/api/data');
         if (json.isEmpty) return null;
         return ActuatorStatusData(
-          lightOn: json['lightOn'] as bool,
-          fanOn: json['fanOn'] as bool,
-          mistOn: json['mistOn'] as bool,
-          heaterOn: json['heaterOn'] as bool,
-          fanReasonCode: json['fanReasonCode'] as int? ?? 0,
-          mistReasonCode: json['mistReasonCode'] as int? ?? 0,
-          lightReasonCode: json['lightReasonCode'] as int? ?? 0,
-          heaterReasonCode: json['heaterReasonCode'] as int? ?? 0,
+          lightOn: json['lightRunning'] as bool,
+          fanOn: json['fanRunning'] as bool,
+          mistOn: json['humidifierOn'] as bool,
+          heaterOn: json['tecOn'] as bool,
+          fanReasonCode: 0,
+          mistReasonCode: 0,
+          lightReasonCode: 0,
+          heaterReasonCode: 0,
         );
       });
+
+  @override
+  Future<void> toggleManualMode() =>
+      _guard(() => _postText('/api/manual/toggle'));
+
+  @override
+  Future<void> toggleTec() => _guard(() => _postText('/api/manual/tec/toggle'));
+
+  @override
+  Future<void> toggleHumidifier() =>
+      _guard(() => _postText('/api/manual/humidifier/toggle'));
+
+  @override
+  Future<void> setFanPwm(int value) =>
+      _guard(() => _get('/api/manual/fan/$value'));
+
+  @override
+  Future<void> setLightPwm(int value) =>
+      _guard(() => _get('/api/manual/light/$value'));
+
+  // The toggle endpoints return plain "ON/OFF" strings, not JSON.
+  // Separate helper so _get/_post don't need to special-case response parsing.
+  Future<void> _postText(String path) async {
+    final response = await _client.post(_uri(path)).timeout(_requestTimeout);
+    _checkStatus(response);
+  }
 
   @override
   Future<StageThresholdsData?> readStageThresholds(
@@ -281,21 +328,6 @@ class WifiDeviceRepository implements DeviceRepository {
         '${response.request?.url}',
       );
     }
-  }
-
-  EnvironmentalReading _environmentalReadingFromJson(
-    Map<String, dynamic> json,
-  ) {
-    return EnvironmentalReading(
-      co2Ppm: json['co2Ppm'] as int,
-      temperatureC: (json['temperatureC'] as num).toDouble(),
-      relativeHumidity: (json['relativeHumidity'] as num).toDouble(),
-      lightRaw: json['lightRaw'] as int,
-      uptimeMs: json['uptimeMs'] as int? ?? 0,
-      timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'] as String)
-          : DateTime.now(),
-    );
   }
 
   ControlTargetsData _controlTargetsFromJson(Map<String, dynamic> json) {

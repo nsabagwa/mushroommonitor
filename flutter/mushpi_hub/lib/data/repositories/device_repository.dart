@@ -103,6 +103,13 @@ abstract class DeviceRepository {
 
   // ---- Lifecycle ----
   void dispose();
+
+  // ----Settings and toggles----
+  Future<void> toggleManualMode();
+  Future<void> toggleTec();
+  Future<void> toggleHumidifier();
+  Future<void> setFanPwm(int value);
+  Future<void> setLightPwm(int value);
 }
 
 /// Thrown by any [DeviceRepository] implementation on communication

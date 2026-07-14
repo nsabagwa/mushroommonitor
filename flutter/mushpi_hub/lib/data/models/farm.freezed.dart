@@ -24,6 +24,8 @@ mixin _$Farm {
   String get name => throw _privateConstructorUsedError; // User-defined name
   String? get deviceId =>
       throw _privateConstructorUsedError; // Linked MushPi device ID (one-to-one)
+  String? get wifiHost =>
+      throw _privateConstructorUsedError; // e.g. "192.168.4.1" -- non-null means this farm connects via LAN
   String? get location =>
       throw _privateConstructorUsedError; // Optional location
 //Fields for ThingSpeak Integration
@@ -65,6 +67,7 @@ abstract class $FarmCopyWith<$Res> {
       {String id,
       String name,
       String? deviceId,
+      String? wifiHost,
       String? location,
       String? thingSpeakChannelId,
       String? thingSpeakReadApiKey,
@@ -97,6 +100,7 @@ class _$FarmCopyWithImpl<$Res, $Val extends Farm>
     Object? id = null,
     Object? name = null,
     Object? deviceId = freezed,
+    Object? wifiHost = freezed,
     Object? location = freezed,
     Object? thingSpeakChannelId = freezed,
     Object? thingSpeakReadApiKey = freezed,
@@ -122,6 +126,10 @@ class _$FarmCopyWithImpl<$Res, $Val extends Farm>
       deviceId: freezed == deviceId
           ? _value.deviceId
           : deviceId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      wifiHost: freezed == wifiHost
+          ? _value.wifiHost
+          : wifiHost // ignore: cast_nullable_to_non_nullable
               as String?,
       location: freezed == location
           ? _value.location
@@ -186,6 +194,7 @@ abstract class _$$FarmImplCopyWith<$Res> implements $FarmCopyWith<$Res> {
       {String id,
       String name,
       String? deviceId,
+      String? wifiHost,
       String? location,
       String? thingSpeakChannelId,
       String? thingSpeakReadApiKey,
@@ -215,6 +224,7 @@ class __$$FarmImplCopyWithImpl<$Res>
     Object? id = null,
     Object? name = null,
     Object? deviceId = freezed,
+    Object? wifiHost = freezed,
     Object? location = freezed,
     Object? thingSpeakChannelId = freezed,
     Object? thingSpeakReadApiKey = freezed,
@@ -240,6 +250,10 @@ class __$$FarmImplCopyWithImpl<$Res>
       deviceId: freezed == deviceId
           ? _value.deviceId
           : deviceId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      wifiHost: freezed == wifiHost
+          ? _value.wifiHost
+          : wifiHost // ignore: cast_nullable_to_non_nullable
               as String?,
       location: freezed == location
           ? _value.location
@@ -300,6 +314,7 @@ class _$FarmImpl implements _Farm {
       {required this.id,
       required this.name,
       this.deviceId,
+      this.wifiHost,
       this.location,
       this.thingSpeakChannelId,
       this.thingSpeakReadApiKey,
@@ -326,6 +341,9 @@ class _$FarmImpl implements _Farm {
   @override
   final String? deviceId;
 // Linked MushPi device ID (one-to-one)
+  @override
+  final String? wifiHost;
+// e.g. "192.168.4.1" -- non-null means this farm connects via LAN
   @override
   final String? location;
 // Optional location
@@ -374,7 +392,7 @@ class _$FarmImpl implements _Farm {
 
   @override
   String toString() {
-    return 'Farm(id: $id, name: $name, deviceId: $deviceId, location: $location, thingSpeakChannelId: $thingSpeakChannelId, thingSpeakReadApiKey: $thingSpeakReadApiKey, notes: $notes, createdAt: $createdAt, lastActive: $lastActive, totalHarvests: $totalHarvests, totalYieldKg: $totalYieldKg, primarySpecies: $primarySpecies, imageUrl: $imageUrl, isActive: $isActive, metadata: $metadata)';
+    return 'Farm(id: $id, name: $name, deviceId: $deviceId, wifiHost: $wifiHost, location: $location, thingSpeakChannelId: $thingSpeakChannelId, thingSpeakReadApiKey: $thingSpeakReadApiKey, notes: $notes, createdAt: $createdAt, lastActive: $lastActive, totalHarvests: $totalHarvests, totalYieldKg: $totalYieldKg, primarySpecies: $primarySpecies, imageUrl: $imageUrl, isActive: $isActive, metadata: $metadata)';
   }
 
   @override
@@ -386,6 +404,8 @@ class _$FarmImpl implements _Farm {
             (identical(other.name, name) || other.name == name) &&
             (identical(other.deviceId, deviceId) ||
                 other.deviceId == deviceId) &&
+            (identical(other.wifiHost, wifiHost) ||
+                other.wifiHost == wifiHost) &&
             (identical(other.location, location) ||
                 other.location == location) &&
             (identical(other.thingSpeakChannelId, thingSpeakChannelId) ||
@@ -417,6 +437,7 @@ class _$FarmImpl implements _Farm {
       id,
       name,
       deviceId,
+      wifiHost,
       location,
       thingSpeakChannelId,
       thingSpeakReadApiKey,
@@ -451,6 +472,7 @@ abstract class _Farm implements Farm {
       {required final String id,
       required final String name,
       final String? deviceId,
+      final String? wifiHost,
       final String? location,
       final String? thingSpeakChannelId,
       final String? thingSpeakReadApiKey,
@@ -472,6 +494,9 @@ abstract class _Farm implements Farm {
   String get name; // User-defined name
   @override
   String? get deviceId; // Linked MushPi device ID (one-to-one)
+  @override
+  String?
+      get wifiHost; // e.g. "192.168.4.1" -- non-null means this farm connects via LAN
   @override
   String? get location; // Optional location
 //Fields for ThingSpeak Integration

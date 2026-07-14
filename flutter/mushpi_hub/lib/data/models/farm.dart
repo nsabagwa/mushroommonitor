@@ -11,6 +11,7 @@ class Farm with _$Farm {
     required String id, // Unique farm ID (UUID)
     required String name, // User-defined name
     String? deviceId, // Linked MushPi device ID (one-to-one)
+    String? wifiHost, // e.g. "192.168.4.1" -- non-null means this farm connects via LAN
     String? location, // Optional location
     //Fields for ThingSpeak Integration
     String? thingSpeakChannelId,
