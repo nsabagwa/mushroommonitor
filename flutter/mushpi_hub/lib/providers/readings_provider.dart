@@ -40,6 +40,52 @@ ThingSpeakConfig? _configFromFarm(Farm? farm) {
   );
 }
 
+/// Attempts to backfill [localReadings] with remote ThingSpeak data for the
+/// given farm/period. This requires looking up the farm's config from
+/// Firebase (via [farmByIdProvider]), which is a network call and can fail
+/// or time out independently of the local DB read that already succeeded.
+///
+/// IMPORTANT: any failure here (farm lookup OR ThingSpeak fetch) must fall
+/// back to [localReadings] rather than propagating - otherwise a transient
+/// Firebase hiccup would discard readings we already have, which is what
+/// caused the intermittent "No Data Available" screen even though local
+/// data existed.
+Future<List<Reading>> _withThingSpeakBackfill({
+  required Ref ref,
+  required String farmId,
+  required DateTime start,
+  required DateTime end,
+  required List<Reading> localReadings,
+}) async {
+  try {
+    final farm = await ref.watch(farmByIdProvider(farmId).future);
+    final config = _configFromFarm(farm);
+    if (config == null) return localReadings;
+
+    final tsRepo = const ThingSpeakRepository();
+    final remoteReadings = await tsRepo.fetchReadingsForPeriod(
+      config: config,
+      farmId: farmId,
+      start: start,
+      end: end,
+    );
+
+    final merged = _mergeReadings(localReadings, remoteReadings);
+    developer.log('After ThingSpeak backfill: ${merged.length} total readings',
+        name: 'mushpi.providers.readings');
+    return merged;
+  } catch (e, stackTrace) {
+    developer.log(
+        'Farm lookup or ThingSpeak backfill failed - falling back to '
+        '${localReadings.length} local readings',
+        name: 'mushpi.providers.readings',
+        error: e,
+        stackTrace: stackTrace,
+        level: 1000);
+    return localReadings;
+  }
+}
+
 final last24HoursReadingsProvider = FutureProvider<List<Reading>>((ref) async {
   final readingsDao = ref.watch(readingsDaoProvider);
   final selectedFarmId = ref.watch(selectedMonitoringFarmIdProvider);
@@ -50,89 +96,67 @@ final last24HoursReadingsProvider = FutureProvider<List<Reading>>((ref) async {
     return [];
   }
 
-  try {
-    final now = DateTime.now();
-    final start = now.subtract(const Duration(hours: 24));
+  final now = DateTime.now();
+  final start = now.subtract(const Duration(hours: 24));
 
-    final localReadings = await readingsDao.getReadingsByFarmAndPeriod(
+  List<Reading> localReadings;
+  try {
+    localReadings = await readingsDao.getReadingsByFarmAndPeriod(
         selectedFarmId, start, now);
 
     developer.log(
         'Fetched ${localReadings.length} local readings for last 24 hours',
         name: 'mushpi.providers.readings');
-
-    final farm = await ref.watch(farmByIdProvider(selectedFarmId).future);
-    final config = _configFromFarm(farm);
-    if (config == null) return localReadings;
-
-    final tsRepo = const ThingSpeakRepository();
-    List<Reading> remoteReadings = [];
-    try {
-      remoteReadings = await tsRepo.fetchReadingsForPeriod(
-        config: config,
-        farmId: selectedFarmId,
-        start: start,
-        end: now,
-      );
-    } catch (_) {
-      return localReadings;
-    }
-
-    final merged = _mergeReadings(localReadings, remoteReadings);
-    developer.log('After ThingSpeak backfill: ${merged.length} total readings',
-        name: 'mushpi.providers.readings');
-    return merged;
   } catch (e, stackTrace) {
-    developer.log('Error fetching 24-hour readings',
+    developer.log('Error fetching local 24-hour readings',
         name: 'mushpi.providers.readings',
         error: e,
         stackTrace: stackTrace,
         level: 1000);
     return [];
   }
+
+  // From here on, any failure (Firebase farm lookup or ThingSpeak fetch)
+  // just skips the backfill - it never discards localReadings.
+  return _withThingSpeakBackfill(
+    ref: ref,
+    farmId: selectedFarmId,
+    start: start,
+    end: now,
+    localReadings: localReadings,
+  );
 });
 
 final readingsByPeriodProvider = FutureProvider.family<List<Reading>,
     ({String farmId, DateTime start, DateTime end})>((ref, params) async {
   final readingsDao = ref.watch(readingsDaoProvider);
 
+  List<Reading> localReadings;
   try {
-    final localReadings = await readingsDao.getReadingsByFarmAndPeriod(
+    localReadings = await readingsDao.getReadingsByFarmAndPeriod(
         params.farmId, params.start, params.end);
 
     developer.log(
         'Fetched ${localReadings.length} local readings for custom period',
         name: 'mushpi.providers.readings');
-
-    final farm = await ref.watch(farmByIdProvider(params.farmId).future);
-    final config = _configFromFarm(farm);
-    if (config == null) return localReadings;
-
-    final tsRepo = const ThingSpeakRepository();
-    List<Reading> remoteReadings = [];
-    try {
-      remoteReadings = await tsRepo.fetchReadingsForPeriod(
-        config: config,
-        farmId: params.farmId,
-        start: params.start,
-        end: params.end,
-      );
-    } catch (_) {
-      return localReadings;
-    }
-
-    final merged = _mergeReadings(localReadings, remoteReadings);
-    developer.log('After ThingSpeak backfill: ${merged.length} total readings',
-        name: 'mushpi.providers.readings');
-    return merged;
   } catch (e, stackTrace) {
-    developer.log('Error fetching readings for custom period',
+    developer.log('Error fetching local readings for custom period',
         name: 'mushpi.providers.readings',
         error: e,
         stackTrace: stackTrace,
         level: 1000);
     return [];
   }
+
+  // From here on, any failure (Firebase farm lookup or ThingSpeak fetch)
+  // just skips the backfill - it never discards localReadings.
+  return _withThingSpeakBackfill(
+    ref: ref,
+    farmId: params.farmId,
+    start: params.start,
+    end: params.end,
+    localReadings: localReadings,
+  );
 });
 
 final recentReadingsProvider =
