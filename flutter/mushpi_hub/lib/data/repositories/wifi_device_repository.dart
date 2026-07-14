@@ -44,6 +44,31 @@ class WifiDeviceRepository implements DeviceRepository {
   final _actuatorStatusController =
       StreamController<ActuatorStatusData>.broadcast();
 
+  EnvironmentalReading _environmentalReadingFromApiData(Map<String, dynamic> json) {
+    return EnvironmentalReading(
+      co2Ppm: json['co2'] as int,
+      temperatureC: (json['temp'] as num).toDouble(),
+      relativeHumidity: (json['humidity'] as num).toDouble(),
+      lightRaw: (json['lux'] as num).round(),
+      uptimeMs: 0,
+      timestamp: DateTime.now(),
+    );
+  }
+
+  ActuatorStatusData? _actuatorStatusFromApiData(Map<String, dynamic> json) {
+    if (json.isEmpty) return null;
+    return ActuatorStatusData(
+      lightOn: json['lightRunning'] as bool,
+      fanOn: json['fanRunning'] as bool,
+      mistOn: json['humidifierOn'] as bool,
+      heaterOn: json['tecOn'] as bool,
+      fanReasonCode: 0,
+      mistReasonCode: 0,
+      lightReasonCode: 0,
+      heaterReasonCode: 0,
+    );
+  }
+
   WifiDeviceRepository({
     http.Client? client,
     Duration requestTimeout = const Duration(seconds: 5),
@@ -99,9 +124,10 @@ class WifiDeviceRepository implements DeviceRepository {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(_pollInterval, (_) async {
       try {
-        _environmentalDataController.add(await readEnvironmentalData());
+        final json = await _get('/api/data');
+        _environmentalDataController.add(_environmentalReadingFromApiData(json));
         _statusFlagsController.add(await readStatusFlags());
-        final actuator = await readActuatorStatus();
+        final actuator = _actuatorStatusFromApiData(json);
         if (actuator != null) _actuatorStatusController.add(actuator);
         // Successful poll; reset failure counter.
         _consecutivePollFailures = 0;
@@ -146,20 +172,14 @@ class WifiDeviceRepository implements DeviceRepository {
   Stream<ActuatorStatusData> get actuatorStatusStream =>
       _actuatorStatusController.stream;
 
+
   // ---- Reads ----
 
   @override
-  Future<EnvironmentalReading> readEnvironmentalData() => _guard(() async {
-        final json = await _get('/api/data');
-        return EnvironmentalReading(
-          co2Ppm: json['co2'] as int,
-          temperatureC: (json['temp'] as num).toDouble(),
-          relativeHumidity: (json['humidity'] as num).toDouble(),
-          lightRaw: (json['lux'] as num).round(),
-          uptimeMs: 0,
-          timestamp: DateTime.now(),
-        );
-      });
+  Future<EnvironmentalReading> readEnvironmentalData() => _guard(() async => _environmentalReadingFromApiData(await _get('/api/data')));
+
+  @override
+  Future<ActuatorStatusData?> readActuatorStatus() => _guard(() async => _actuatorStatusFromApiData(await _get('/api/data')));
 
   @override
   Future<ControlTargetsData> readControlTargets() => _guard(() async {
@@ -177,22 +197,6 @@ class WifiDeviceRepository implements DeviceRepository {
   Future<int> readStatusFlags() => _guard(() async {
         final json = await _get('/status-flags');
         return json['flags'] as int;
-      });
-
-  @override
-  Future<ActuatorStatusData?> readActuatorStatus() => _guard(() async {
-        final json = await _get('/api/data');
-        if (json.isEmpty) return null;
-        return ActuatorStatusData(
-          lightOn: json['lightRunning'] as bool,
-          fanOn: json['fanRunning'] as bool,
-          mistOn: json['humidifierOn'] as bool,
-          heaterOn: json['tecOn'] as bool,
-          fanReasonCode: 0,
-          mistReasonCode: 0,
-          lightReasonCode: 0,
-          heaterReasonCode: 0,
-        );
       });
 
   @override
