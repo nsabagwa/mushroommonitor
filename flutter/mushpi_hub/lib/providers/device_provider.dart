@@ -24,7 +24,7 @@ final farmDeviceRepositoryProvider = FutureProvider.autoDispose
   // choice, not an accident. Revisit if a farm ever legitimately needs both.
   if (farm.wifiHost != null) {
     repository = WifiDeviceRepository();
-    target = WifiDeviceTarget(farm.wifiHost!);
+    target = WifiDeviceTarget(farm.wifiHost!, port: farm.wifiPort);
   } else if (farm.deviceId != null) {
     // Untested path today — routing a BLE farm through here means a
     // second thing calling .connect() on the same bleRepositoryProvider

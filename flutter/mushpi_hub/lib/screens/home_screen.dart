@@ -131,6 +131,9 @@ class _CreateFarmDialogState extends ConsumerState<_CreateFarmDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _locationController = TextEditingController();
+  final _wifiHostController = TextEditingController();
+  final _wifiPortController = TextEditingController(text: '80');
+  ConnectionType _connectionType = ConnectionType.none;
   Species _selectedSpecies = Species.oyster;
   bool _isCreating = false;
 

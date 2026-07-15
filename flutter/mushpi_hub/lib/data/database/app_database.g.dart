@@ -575,7 +575,7 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
     this.imageUrl = const Value.absent(),
     this.isActive = const Value.absent(),
     this.metadata = const Value.absent(),
-    this.rowid = const Value.absent(),
+    this.rowid = const Value.absent(), required Value<String?> wifiHost,
   });
   FarmsCompanion.insert({
     required String id,
@@ -1322,6 +1322,12 @@ class $DevicesTable extends Devices with TableInfo<$DevicesTable, Device> {
   late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
       'device_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _wifiHostMeta =
+      const VerificationMeta('wifiHost');
+  @override
+  late final GeneratedColumn<String> wifiHost = GeneratedColumn<String>(
+      'wifi_host', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
@@ -1349,7 +1355,7 @@ class $DevicesTable extends Devices with TableInfo<$DevicesTable, Device> {
           type: DriftSqlType.dateTime, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns =>
-      [deviceId, name, address, farmId, lastConnected];
+      [deviceId, wifiHost, name, address, farmId, lastConnected];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1363,6 +1369,10 @@ class $DevicesTable extends Devices with TableInfo<$DevicesTable, Device> {
     if (data.containsKey('device_id')) {
       context.handle(_deviceIdMeta,
           deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    }
+    if (data.containsKey('wifi_host')) {
+      context.handle(_wifiHostMeta,
+          wifiHost.isAcceptableOrUnknown(data['wifi_host']!, _wifiHostMeta));
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -1399,6 +1409,8 @@ class $DevicesTable extends Devices with TableInfo<$DevicesTable, Device> {
     return Device(
       deviceId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
+      wifiHost: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}wifi_host']),
       name: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
       address: attachedDatabase.typeMapping
@@ -1418,12 +1430,14 @@ class $DevicesTable extends Devices with TableInfo<$DevicesTable, Device> {
 
 class Device extends DataClass implements Insertable<Device> {
   final String? deviceId;
+  final String? wifiHost;
   final String name;
   final String address;
   final String? farmId;
   final DateTime lastConnected;
   const Device(
       {this.deviceId,
+      this.wifiHost,
       required this.name,
       required this.address,
       this.farmId,
@@ -1433,6 +1447,9 @@ class Device extends DataClass implements Insertable<Device> {
     final map = <String, Expression>{};
     if (!nullToAbsent || deviceId != null) {
       map['device_id'] = Variable<String>(deviceId);
+    }
+    if (!nullToAbsent || wifiHost != null) {
+      map['wifi_host'] = Variable<String>(wifiHost);
     }
     map['name'] = Variable<String>(name);
     map['address'] = Variable<String>(address);
@@ -1448,6 +1465,9 @@ class Device extends DataClass implements Insertable<Device> {
       deviceId: deviceId == null && nullToAbsent
           ? const Value.absent()
           : Value(deviceId),
+      wifiHost: wifiHost == null && nullToAbsent
+          ? const Value.absent()
+          : Value(wifiHost),
       name: Value(name),
       address: Value(address),
       farmId:
@@ -1461,6 +1481,7 @@ class Device extends DataClass implements Insertable<Device> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Device(
       deviceId: serializer.fromJson<String?>(json['deviceId']),
+      wifiHost: serializer.fromJson<String?>(json['wifiHost']),
       name: serializer.fromJson<String>(json['name']),
       address: serializer.fromJson<String>(json['address']),
       farmId: serializer.fromJson<String?>(json['farmId']),
@@ -1472,6 +1493,7 @@ class Device extends DataClass implements Insertable<Device> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'deviceId': serializer.toJson<String?>(deviceId),
+      'wifiHost': serializer.toJson<String?>(wifiHost),
       'name': serializer.toJson<String>(name),
       'address': serializer.toJson<String>(address),
       'farmId': serializer.toJson<String?>(farmId),
@@ -1481,12 +1503,14 @@ class Device extends DataClass implements Insertable<Device> {
 
   Device copyWith(
           {Value<String?> deviceId = const Value.absent(),
+          Value<String?> wifiHost = const Value.absent(),
           String? name,
           String? address,
           Value<String?> farmId = const Value.absent(),
           DateTime? lastConnected}) =>
       Device(
         deviceId: deviceId.present ? deviceId.value : this.deviceId,
+        wifiHost: wifiHost.present ? wifiHost.value : this.wifiHost,
         name: name ?? this.name,
         address: address ?? this.address,
         farmId: farmId.present ? farmId.value : this.farmId,
@@ -1495,6 +1519,7 @@ class Device extends DataClass implements Insertable<Device> {
   Device copyWithCompanion(DevicesCompanion data) {
     return Device(
       deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      wifiHost: data.wifiHost.present ? data.wifiHost.value : this.wifiHost,
       name: data.name.present ? data.name.value : this.name,
       address: data.address.present ? data.address.value : this.address,
       farmId: data.farmId.present ? data.farmId.value : this.farmId,
@@ -1508,6 +1533,7 @@ class Device extends DataClass implements Insertable<Device> {
   String toString() {
     return (StringBuffer('Device(')
           ..write('deviceId: $deviceId, ')
+          ..write('wifiHost: $wifiHost, ')
           ..write('name: $name, ')
           ..write('address: $address, ')
           ..write('farmId: $farmId, ')
@@ -1518,12 +1544,13 @@ class Device extends DataClass implements Insertable<Device> {
 
   @override
   int get hashCode =>
-      Object.hash(deviceId, name, address, farmId, lastConnected);
+      Object.hash(deviceId, wifiHost, name, address, farmId, lastConnected);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Device &&
           other.deviceId == this.deviceId &&
+          other.wifiHost == this.wifiHost &&
           other.name == this.name &&
           other.address == this.address &&
           other.farmId == this.farmId &&
@@ -1532,6 +1559,7 @@ class Device extends DataClass implements Insertable<Device> {
 
 class DevicesCompanion extends UpdateCompanion<Device> {
   final Value<String?> deviceId;
+  final Value<String?> wifiHost;
   final Value<String> name;
   final Value<String> address;
   final Value<String?> farmId;
@@ -1539,6 +1567,7 @@ class DevicesCompanion extends UpdateCompanion<Device> {
   final Value<int> rowid;
   const DevicesCompanion({
     this.deviceId = const Value.absent(),
+    this.wifiHost = const Value.absent(),
     this.name = const Value.absent(),
     this.address = const Value.absent(),
     this.farmId = const Value.absent(),
@@ -1547,6 +1576,7 @@ class DevicesCompanion extends UpdateCompanion<Device> {
   });
   DevicesCompanion.insert({
     this.deviceId = const Value.absent(),
+    this.wifiHost = const Value.absent(),
     required String name,
     required String address,
     this.farmId = const Value.absent(),
@@ -1557,6 +1587,7 @@ class DevicesCompanion extends UpdateCompanion<Device> {
         lastConnected = Value(lastConnected);
   static Insertable<Device> custom({
     Expression<String>? deviceId,
+    Expression<String>? wifiHost,
     Expression<String>? name,
     Expression<String>? address,
     Expression<String>? farmId,
@@ -1565,6 +1596,7 @@ class DevicesCompanion extends UpdateCompanion<Device> {
   }) {
     return RawValuesInsertable({
       if (deviceId != null) 'device_id': deviceId,
+      if (wifiHost != null) 'wifi_host': wifiHost,
       if (name != null) 'name': name,
       if (address != null) 'address': address,
       if (farmId != null) 'farm_id': farmId,
@@ -1575,6 +1607,7 @@ class DevicesCompanion extends UpdateCompanion<Device> {
 
   DevicesCompanion copyWith(
       {Value<String?>? deviceId,
+      Value<String?>? wifiHost,
       Value<String>? name,
       Value<String>? address,
       Value<String?>? farmId,
@@ -1582,6 +1615,7 @@ class DevicesCompanion extends UpdateCompanion<Device> {
       Value<int>? rowid}) {
     return DevicesCompanion(
       deviceId: deviceId ?? this.deviceId,
+      wifiHost: wifiHost ?? this.wifiHost,
       name: name ?? this.name,
       address: address ?? this.address,
       farmId: farmId ?? this.farmId,
@@ -1595,6 +1629,9 @@ class DevicesCompanion extends UpdateCompanion<Device> {
     final map = <String, Expression>{};
     if (deviceId.present) {
       map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (wifiHost.present) {
+      map['wifi_host'] = Variable<String>(wifiHost.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -1618,6 +1655,7 @@ class DevicesCompanion extends UpdateCompanion<Device> {
   String toString() {
     return (StringBuffer('DevicesCompanion(')
           ..write('deviceId: $deviceId, ')
+          ..write('wifiHost: $wifiHost, ')
           ..write('name: $name, ')
           ..write('address: $address, ')
           ..write('farmId: $farmId, ')
@@ -3169,6 +3207,7 @@ typedef $$HarvestsTableProcessedTableManager = ProcessedTableManager<
     PrefetchHooks Function({bool farmId})>;
 typedef $$DevicesTableCreateCompanionBuilder = DevicesCompanion Function({
   Value<String?> deviceId,
+  Value<String?> wifiHost,
   required String name,
   required String address,
   Value<String?> farmId,
@@ -3177,6 +3216,7 @@ typedef $$DevicesTableCreateCompanionBuilder = DevicesCompanion Function({
 });
 typedef $$DevicesTableUpdateCompanionBuilder = DevicesCompanion Function({
   Value<String?> deviceId,
+  Value<String?> wifiHost,
   Value<String> name,
   Value<String> address,
   Value<String?> farmId,
@@ -3214,6 +3254,9 @@ class $$DevicesTableFilterComposer
   });
   ColumnFilters<String> get deviceId => $composableBuilder(
       column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get wifiHost => $composableBuilder(
+      column: $table.wifiHost, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get name => $composableBuilder(
       column: $table.name, builder: (column) => ColumnFilters(column));
@@ -3257,6 +3300,9 @@ class $$DevicesTableOrderingComposer
   ColumnOrderings<String> get deviceId => $composableBuilder(
       column: $table.deviceId, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get wifiHost => $composableBuilder(
+      column: $table.wifiHost, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get name => $composableBuilder(
       column: $table.name, builder: (column) => ColumnOrderings(column));
 
@@ -3299,6 +3345,9 @@ class $$DevicesTableAnnotationComposer
   });
   GeneratedColumn<String> get deviceId =>
       $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<String> get wifiHost =>
+      $composableBuilder(column: $table.wifiHost, builder: (column) => column);
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
@@ -3354,6 +3403,7 @@ class $$DevicesTableTableManager extends RootTableManager<
               $$DevicesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<String?> deviceId = const Value.absent(),
+            Value<String?> wifiHost = const Value.absent(),
             Value<String> name = const Value.absent(),
             Value<String> address = const Value.absent(),
             Value<String?> farmId = const Value.absent(),
@@ -3362,6 +3412,7 @@ class $$DevicesTableTableManager extends RootTableManager<
           }) =>
               DevicesCompanion(
             deviceId: deviceId,
+            wifiHost: wifiHost,
             name: name,
             address: address,
             farmId: farmId,
@@ -3370,6 +3421,7 @@ class $$DevicesTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             Value<String?> deviceId = const Value.absent(),
+            Value<String?> wifiHost = const Value.absent(),
             required String name,
             required String address,
             Value<String?> farmId = const Value.absent(),
@@ -3378,6 +3430,7 @@ class $$DevicesTableTableManager extends RootTableManager<
           }) =>
               DevicesCompanion.insert(
             deviceId: deviceId,
+            wifiHost: wifiHost,
             name: name,
             address: address,
             farmId: farmId,

@@ -282,6 +282,23 @@ class FarmOperations {
     }
   }
 
+  Future<void> updateWifiHost({required String farmId, String? host}) async {
+    try {
+      await repository.updateWifiHost(farmId, host);
+      _refreshFarms();
+      ref.invalidate(farmByIdProvider(farmId));
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to update wifi host',
+        name: 'mushpi.providers.farms.ops',
+        error: error,
+        stackTrace: stackTrace,
+        level: 1000,
+      );
+      rethrow;
+    }
+  }
+
   /// Add ThingSpeak as an optional feature for remote monitoring
   Future<void> updateThingSpeak({
     required String farmId,

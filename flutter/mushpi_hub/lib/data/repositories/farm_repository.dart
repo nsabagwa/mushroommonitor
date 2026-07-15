@@ -258,6 +258,19 @@ class FarmRepository {
     }
   }
 
+  /// Link a Wifi/LAN connection to a farm.
+  Future<void> updateWifiHost(String farmId, String? host) async {
+    try {
+      await _database.farmsDao.updateWifiHost(farmId, host);
+      developer.log(
+        host != null ? 'Wifi connection linked to farm $farmId' : 'Wifi connection removed from farm $farmId', name: 'FarmRepository',
+      );
+    } catch (e, stackTrace) {
+      developer.log('Failed to update Wifi host', name: 'FarmRepository', error:e, stackTrace: stackTrace, level:1000);
+      rethrow;
+    }
+  }
+
   /// Update farm's last active timestamp
   Future<void> updateLastActive(String farmId) async {
     try {

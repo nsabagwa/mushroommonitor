@@ -8,6 +8,9 @@ import '../providers/current_farm_provider.dart';
 import '../data/models/farm.dart';
 import '../providers/farms_provider.dart';
 
+import '../data/repositories/device_repository.dart';
+import '../data/repositories/wifi_device_repository.dart';
+
 /// Farm detail screen showing single farm monitoring.
 ///
 /// Displays:
@@ -169,6 +172,7 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
 
                 const SizedBox(height: 16),
                 _ThingSpeakCard(farm: farm, farmId: widget.farmId),
+                _LanCard(farm: farm, farmId: widget.farmId),
 
                 // TODO: Add environmental data cards
                 // TODO: Add control panels
@@ -349,6 +353,151 @@ class _ThingSpeakCard extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<_ThingSpeakCard> createState() => _ThingSpeakCardState();
+}
+
+class _LanCard extends ConsumerStatefulWidget {
+  const _LanCard({required this.farm, required this.farmId});
+  final Farm farm;
+  final String farmId;
+
+  @override
+  ConsumerState<_LanCard> createState() => _LanCardState();
+}
+
+class _LanCardState extends ConsumerState<_LanCard> {
+  late final TextEditingController _hostController;
+  bool _isTesting = false;
+  bool _isSaving = false;
+  String? _testResult;
+  bool _testPassed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _hostController =
+        TextEditingController(text: widget.farm.wifiHost ?? '192.168.4.1');
+  }
+
+  @override
+  void dispose() {
+    _hostController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _testConnection() async {
+    final host = _hostController.text.trim();
+    if (host.isEmpty) {
+      setState(() {
+        _testResult = 'Please enter an IP address';
+        _testPassed = false;
+      });
+      return;
+    }
+    setState(() {
+      _isTesting = true;
+      _testResult = null;
+    });
+
+    final repo = WifiDeviceRepository();
+    try {
+      await repo.connect(WifiDeviceTarget(host));
+      final reading = await repo.readEnvironmentalData();
+      setState(() {
+        _testPassed = true;
+        _testResult = 'Connected! Temp: ${reading.temperatureC}°C';
+      });
+    } catch (e) {
+      setState(() {
+        _testPassed = false;
+        _testResult = 'Failed: $e';
+      });
+    } finally {
+      repo.dispose();
+      setState(() => _isTesting = false);
+    }
+  }
+
+  Future<void> _saveHost() async {
+    setState(() => _isSaving = true);
+    try {
+      final ops = ref.read(farmOperationsProvider);
+      final host = _hostController.text.trim();
+      await ops.updateWifiHost(
+          farmId: widget.farmId, host: host.isEmpty ? null : host);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Wi-Fi address saved'),
+            backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Failed to save: $e'),
+            backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Local network (LAN) control',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 8),
+            const Text(
+              "Join the device's own Wi-Fi network in your phone settings "
+              'first, then test below.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _hostController,
+              decoration: const InputDecoration(
+                  labelText: 'Device IP address', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              ElevatedButton(
+                onPressed: _isTesting ? null : _testConnection,
+                child: _isTesting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Test'),
+              ),
+              const SizedBox(width: 12),
+              if (_testPassed)
+                ElevatedButton(
+                  onPressed: _isSaving ? null : _saveHost,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Save'),
+                ),
+            ]),
+            if (_testResult != null) ...[
+              const SizedBox(height: 8),
+              Text(_testResult!,
+                  style:
+                      TextStyle(color: _testPassed ? Colors.green : Colors.red)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ThingSpeakCardState extends ConsumerState<_ThingSpeakCard> {

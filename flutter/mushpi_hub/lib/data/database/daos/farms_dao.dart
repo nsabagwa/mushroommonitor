@@ -93,4 +93,9 @@ class FarmsDao extends DatabaseAccessor<AppDatabase> with _$FarmsDaoMixin {
         .write(FarmsCompanion(thingSpeakChannelId: Value(channelId), thingSpeakReadApiKey: Value(readApiKey)));
   }
   
+  /// Link Wifi connection to farm
+  Future<int> updateWifiHost(String farmId, String? host) async {
+    return (update(farms)..where((f) => f.id.equals(farmId))).write(FarmsCompanion(wifiHost: Value(host)));
+
+  }
 }
