@@ -1,456 +1,183 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
+import 'dart:async';
 
-import '../../providers/thingspeak_provider.dart';
-import '../../providers/farms_provider.dart';
-import '../../providers/current_farm_provider.dart';
-import '../../widgets/farm_card.dart';
-import '../../widgets/theme_selector.dart';
-import '../models/farm.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+
 import '../../core/constants/ble_constants.dart';
+import '../../core/utils/ble_serializer.dart';
+import 'ble_repository.dart';
+import 'device_repository.dart';
 
-const _uuid = Uuid();
+/// Adapts the existing [BLERepository] to the transport-agnostic
+/// [DeviceRepository] interface.
+///
+/// This is a thin wrapper, not a rewrite: it holds a [BLERepository]
+/// instance and delegates to it.
+class BleDeviceRepository implements DeviceRepository {
+  final BLERepository _repository;
 
-/// Home screen showing overview of all farms.
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+  BleDeviceRepository(this._repository);
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final farmsAsync = ref.watch(activeFarmsProvider);
+  // ---- Manual Override State ----
+  int _overrideBits = 0;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Farms'),
-        actions: const [
-          ThemeToggleButton(),
-        ],
-      ),
-      body: farmsAsync.when(
-        data: (farms) {
-          if (farms.isEmpty) {
-            return _EmptyFarmsView(
-              onAddFarm: () => _showCreateFarmDialog(context, ref),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: () => ref.refresh(activeFarmsProvider.future),
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: _StatsHeader(
-                      farmCount: farms.length,
-                      farms: farms,
-                    ),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final farm = farms[index];
-                        return FarmCard(
-                          farm: farm,
-                          onTap: () {
-                            ref
-                                .read(selectedMonitoringFarmIdProvider.notifier)
-                                .state = farm.id;
-                            context.go('/monitoring');
-                          },
-                        );
-                      },
-                      childCount: farms.length,
-                    ),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 80)),
-              ],
-            ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64,
-                  color: Theme.of(context).colorScheme.error),
-              const SizedBox(height: 16),
-              Text('Error loading farms',
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Text(error.toString(),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () => ref.invalidate(activeFarmsProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateFarmDialog(context, ref),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Farm'),
-      ),
-    );
-  }
-
-  Future<void> _showCreateFarmDialog(
-      BuildContext context, WidgetRef ref) async {
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => const _CreateFarmDialog(),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Farm creation dialog — no BLE required.
-// A device can be linked later from the Farm Detail screen.
-// ---------------------------------------------------------------------------
-
-class _CreateFarmDialog extends ConsumerStatefulWidget {
-  const _CreateFarmDialog();
-
-  @override
-  ConsumerState<_CreateFarmDialog> createState() => _CreateFarmDialogState();
-}
-
-class _CreateFarmDialogState extends ConsumerState<_CreateFarmDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _locationController = TextEditingController();
-  Species _selectedSpecies = Species.oyster;
-  bool _isCreating = false;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _locationController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _createFarm() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isCreating = true);
-
-    try {
-      final operations = ref.read(farmOperationsProvider);
-
-      await operations.createFarm(
-        id: _uuid.v4(),
-        name: _nameController.text.trim(),
-        location: _locationController.text.trim().isEmpty
-            ? null
-            : _locationController.text.trim(),
-        primarySpecies: _selectedSpecies,
-        // deviceId intentionally omitted — link a device from Farm Detail
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Farm "${_nameController.text.trim()}" created! Link a device from the farm detail screen.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create farm: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isCreating = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Create New Farm'),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Farm Name *',
-                  hintText: 'e.g., Basement Farm',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-                textCapitalization: TextCapitalization.words,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a farm name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              Text('Mushroom Species *',
-                  style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: Species.values.map((species) {
-                  return FilterChip(
-                    label: Text('${species.icon} ${species.displayName}'),
-                    selected: _selectedSpecies == species,
-                    onSelected: (_) =>
-                        setState(() => _selectedSpecies = species),
-                    showCheckmark: false,
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _locationController,
-                decoration: const InputDecoration(
-                  labelText: 'Location (optional)',
-                  hintText: 'e.g., Basement, Shed',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, size: 16,
-                      color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'You can link a MushPi device to this farm later from the farm detail screen.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isCreating ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _isCreating ? null : _createFarm,
-          child: _isCreating
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Create Farm'),
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Empty state
-// ---------------------------------------------------------------------------
-
-class _EmptyFarmsView extends StatelessWidget {
-  const _EmptyFarmsView({required this.onAddFarm});
-
-  final VoidCallback onAddFarm;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.eco_outlined,
-              size: 120,
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 24),
-            Text('No Farms Yet',
-                style: Theme.of(context).textTheme.headlineMedium,
-                textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            Text(
-              'Start your mushroom cultivation journey by adding your first farm.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: onAddFarm,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Your First Farm'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Stats header
-// ---------------------------------------------------------------------------
-
-class _StatsHeader extends StatelessWidget {
-  const _StatsHeader({required this.farmCount, required this.farms});
-
-  final int farmCount;
-  final List<Farm> farms;
-
-  int _countOnlineFarms(List<Farm> farms) {
-    final now = DateTime.now();
-    return farms.where((farm) {
-      return farm.lastActive != null &&
-          now.difference(farm.lastActive!).inMinutes < 1;
-    }).length;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final online = _countOnlineFarms(farms);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Expanded(
-              child: _StatItem(
-                icon: Icons.agriculture,
-                label: 'Active Farms',
-                value: farmCount.toString(),
-                color: colorScheme.primary,
-              ),
-            ),
-            Container(width: 1, height: 40, color: colorScheme.outlineVariant),
-            Expanded(
-              child: _StatItem(
-                icon: Icons.check_circle_outline,
-                label: 'Online',
-                value: online.toString(),
-                color: online > 0 ? Colors.green : colorScheme.tertiary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatItem extends StatelessWidget {
-  const _StatItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
+  Future<void> _writeOverrideBit(int bitmask, bool enabled) => _guard(() {
+    _overrideBits = enabled ? (_overrideBits | bitmask) : (_overrideBits & ~bitmask);
+    return _repository.writeOverrideBits(_overrideBits);
   });
 
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
+  Future<void> _toggleOverrideBit(int bitmask) => _writeOverrideBit(bitmask, (_overrideBits & bitmask) == 0);
+
+  // ---- Connection lifecycle ----
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 32),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 4),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
+  Future<void> connect(DeviceTarget target) => _guard(() async {
+    if (target is! BleDeviceTarget) {
+      throw ArgumentError(
+        'BleDeviceRepository received a ${target.runtimeType}; '
+        'expected BleDeviceTarget',
+      );
+    }
+
+    var device = target.resolvedDevice as BluetoothDevice?;
+
+    // No live scan object was handed in (e.g. reconnecting to a 
+    // previously-linked farm after an app relaunch) - scan and match
+    // by ID, same strategy auto_reconnect_provider.dart already uses.
+    device ??= await _findDeviceById(target.deviceId);
+
+    if (device == null) {
+      throw DeviceRepositoryException('Device ${target.deviceId} not found');
+    }
+
+    await _repository.connect(device);
+  });
+
+  @override
+  Future<void> disconnect() => _guard(() => _repository.disconnect());
+
+  @override
+  bool get isConnected => _repository.isConnected;
+
+  @override
+  Stream<DeviceConnectionState> get connectionStateStream => _repository.connectionStateStream.map(_mapConnectionState);
+
+  DeviceConnectionState _mapConnectionState(BluetoothConnectionState state) {
+    // flutter_blue_plus only distinguishes connected/disconnected today;
+    // there's no interim "connecting" event from the platform layer.
+    return state == BluetoothConnectionState.connected ? DeviceConnectionState.connected : DeviceConnectionState.disconnected;
   }
-}
 
-// ---------------------------------------------------------------------------
-// ThingSpeak test dialog (temporary)
-// ---------------------------------------------------------------------------
+  /// Scans and matches by remoteId string, mirroring
+  /// auto_reconnect_provider.dart's '_scanAndConnect'.
+  Future<BluetoothDevice?> _findDeviceById(
+    String deviceId, {
+      Duration timeout = const Duration(seconds: 10),
+    }
+  ) async {
+    final completer = Completer<BluetoothDevice?>();
+    final subscription = _repository.scanResultsStream.listen((results) {
+      for (final result in results) {
+        if (result.device.remoteId.toString() == deviceId) {
+          if (!completer.isCompleted) completer.complete(result.device);
+          break;
+        }
+      }
+    });
 
-// ignore: unused_element
-class _ThingSpeakTestDialog extends ConsumerWidget {
-  const _ThingSpeakTestDialog({required this.farm});
-  final Farm farm;
+    await _repository.startScan(timeout: timeout);
+    
+    final found = await completer.future.timeout(
+      timeout + const Duration(seconds: 1),
+      onTimeout: () => null,
+    );
+
+    await subscription.cancel();
+    await _repository.stopScan();
+
+    return found;
+  }
+
+  // ---- Live data streams ----
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final hasThingSpeak = farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
-    final thingSpeakAsync = hasThingSpeak ? ref.watch(thingSpeakProvider((
-      channelId: farm.thingSpeakChannelId!,
-      readApiKey: farm.thingSpeakReadApiKey!,
-    ))) : const AsyncValue<ThingSpeakReading>.loading();
+  Stream<EnvironmentalReading> get environmentalDataStream => _repository.environmentalDataStream;
 
-    return AlertDialog(
-      title: const Text('ThingSpeak Test'),
-      content: thingSpeakAsync.when(
-        data: (reading) => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Time: ${reading.time}'),
-            Text('Temp: ${reading.temperature}°C'),
-            Text('Hum: ${reading.humidity}%'),
-            Text('CO2: ${reading.co2} ppm'),
-            Text('Light: ${reading.light}'),
-          ],
-        ),
-        loading: () => const CircularProgressIndicator(),
-        error: (e, _) => Text('Error: $e'),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('OK'),
-        ),
-      ],
-    );
+  @override
+  Stream<int> get statusFlagsStream => _repository.statusFlagsStream;
+
+  @override
+  Stream<ActuatorStatusData> get actuatorStatusStream => _repository.actuatorStatusStream;
+
+  // ---- Reads ----
+
+  @override
+  Future<EnvironmentalReading> readEnvironmentalData() => _guard(() => _repository.readEnvironmentalData());
+
+  @override
+  Future<ControlTargetsData> readControlTargets() => _guard(() => _repository.readControlTargets());
+
+  @override
+  Future<StageStateData> readStageState() => _guard(() => _repository.readStageState());
+
+  @override
+  Future<int> readStatusFlags() => _guard(() => _repository.readStatusFlags());
+
+  @override
+  Future<ActuatorStatusData?> readActuatorStatus() => _guard(() => _repository.readActuatorStatus());
+
+  @override
+  Future<StageThresholdsData?> readStageThresholds(
+    Species species, 
+    GrowthStage stage
+    ) => _guard(() => _repository.readStageThresholds(species, stage));
+
+
+  // ---- Writes ----
+
+  @override
+  Future<void> writeControlTargets(ControlTargetsData targets) => _guard(() => _repository.writeControlTargets(targets));
+
+  @override
+  Future<void> writeOverrideBits(int bits) => _guard(() => _repository.writeOverrideBits(bits));
+
+  @override
+  Future<void> writeStageState(StageStateData state) => _guard(() => _repository.writeStageState(state));
+
+  @override
+  Future<bool> writeStageThresholds(StageThresholdsData thresholds) => _guard(() => _repository.writeStageThresholds(thresholds));
+
+  // ---- Manual Controls ----
+
+  @override
+  Future<void> toggleManualMode() => _toggleOverrideBit(OverrideBits.disableAuto);
+
+  @override
+  Future<void> toggleTec() => _toggleOverrideBit(OverrideBits.heater);
+
+  @override
+  Future<void> toggleHumidifier() => _toggleOverrideBit(OverrideBits.mist);
+
+  @override
+  Future<void> setFanPwm(int value) => _writeOverrideBit(OverrideBits.fan, value > 0);
+
+  @override
+  Future<void> setLightPwm(int value) => _writeOverrideBit(OverrideBits.light, value > 0);
+
+  // ---- Lifecycle ----
+
+  @override
+  void dispose() => _repository.dispose();
+
+  /// Wraps BLE-specific failures into [DeviceRepositoryException] so
+  /// callers above this layer can catch one exception type regardless of
+  /// which transport is active.
+  Future<T> _guard<T>(Future<T> Function() action) async {
+    try {
+      return await action();
+    } on DeviceRepositoryException {
+      rethrow;
+    } catch (e) {
+      throw DeviceRepositoryException('BLE operation failed', cause: e);
+    }
   }
 }
