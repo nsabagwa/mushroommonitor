@@ -28,13 +28,13 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (Migrator m) async => await m.createAll(),
     onUpgrade: (Migrator m, int from, int to) async {
-      if (from == 1) {
+      if (from < 3) {
         await m.addColumn(farms, farms.wifiHost);
         await m.addColumn(farms, farms.wifiPort);
       }

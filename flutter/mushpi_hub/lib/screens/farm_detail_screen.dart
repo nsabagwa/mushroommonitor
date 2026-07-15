@@ -100,13 +100,8 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              developer.log(
-                '⚙️ [FarmDetailScreen] Opening farm options menu',
-                name: 'mushpi.screens.farm_detail',
-              );
-              // TODO: Show farm options menu
-            },
+            tooltip: 'Delete Farm',
+            onPressed: () => _confirmDelete(context, ref, widget.farmId),
           ),
         ],
       ),
@@ -340,6 +335,25 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
       return '${diff.inDays}d ago';
     } else {
       return '${date.day}/${date.month}/${date.year}';
+    }
+  }
+  
+    Future<void> _confirmDelete(BuildContext context, WidgetRef ref, String farmId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Delete Farm"),
+        content: const Text("Are you really sure? This action cannot be reversed."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Delete")),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await ref.read(farmOperationsProvider).deleteFarm(farmId);
+      if (context.mounted) Navigator.pop(context); // close the dialog
     }
   }
 }

@@ -5,6 +5,8 @@ class Farms extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
   TextColumn get deviceId => text().nullable().unique()(); // One device per farm
+  TextColumn get wifiHost => text().nullable()(); // LAN/Wifi host (IP or hostname)
+  IntColumn get wifiPort => integer().nullable().withDefault(const Constant(80))(); // LAN/Wifi port
   TextColumn get location => text().nullable()();
   TextColumn get notes => text().nullable()();
   TextColumn get thingSpeakChannelId => text().nullable()();
@@ -43,8 +45,6 @@ class Harvests extends Table {
 /// Devices table - BLE device connections
 class Devices extends Table {
   TextColumn get deviceId => text().nullable()();
-  TextColumn get wifiHost => text().nullable()(); // LAN/Wifi host (IP or hostname)
-  //IntColumn get wifiPort => integer().nullable().withDefault(const Constant(80))(); // LAN/Wifi port
   TextColumn get name => text()();
   TextColumn get address => text()();
   TextColumn get farmId => text().nullable().references(Farms, #id)();
