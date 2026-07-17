@@ -126,7 +126,6 @@ class WifiDeviceRepository implements DeviceRepository {
       try {
         final json = await _get('/api/data');
         _environmentalDataController.add(_environmentalReadingFromApiData(json));
-        _statusFlagsController.add(await readStatusFlags());
         final actuator = _actuatorStatusFromApiData(json);
         if (actuator != null) _actuatorStatusController.add(actuator);
         // Successful poll; reset failure counter.

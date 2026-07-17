@@ -271,7 +271,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                     ),
                   ),
 
-                // Environmental overview – always remote (ThingSpeak)
+                // Environmental overview
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),

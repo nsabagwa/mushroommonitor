@@ -43,9 +43,6 @@ final farmDeviceRepositoryProvider = FutureProvider.autoDispose.family<DeviceRep
   ref.onDispose(repository.dispose);
   await repository.connect(target);
 
-  ref.onDispose(repository.dispose);
-  await repository.connect(target);
-
   // Keep farm.lastActive fresh while this repository has a live
   // connection, so a farm shows 'online' the same way BLE farms already
   // do via BLEConnectionManager. This is a new behaviour for Wi-Fi; BLE
@@ -96,4 +93,9 @@ final farmConnectionStateProvider = StreamProvider.autoDispose.family<DeviceConn
 final farmActuatorStatusProvider = StreamProvider.autoDispose.family<ActuatorStatusData, String>((ref, farmId) async* {
   final repository = await ref.watch(farmDeviceRepositoryProvider(farmId).future);
   yield* repository.actuatorStatusStream;
+});
+
+final farmEnvironmentalDataProvider = StreamProvider.autoDispose.family<EnvironmentalReading, String>((ref, farmId) async* {
+  final repository = await ref.watch(farmDeviceRepositoryProvider(farmId).future);
+  yield* repository.environmentalDataStream;
 });
