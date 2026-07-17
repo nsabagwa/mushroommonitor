@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mushpi_hub/providers/device_provider.dart';
 
 import '../providers/farms_provider.dart';
 import '../providers/current_farm_provider.dart';
@@ -294,7 +295,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _ActuatorStateCard(),
+                    child: _ActuatorStateCard(farmId: selectedFarm.id),
                   ),
                 ),
 
@@ -1044,10 +1045,14 @@ class _EnvironmentalMetric extends StatelessWidget {
 
 /// Actuator modes/state card (unchanged)
 class _ActuatorStateCard extends ConsumerWidget {
+  const _ActuatorStateCard({required this.farmId});
+
+  final String farmId;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final targetsAsync = ref.watch(controlTargetsFutureProvider);
-    final actuatorStatusAsync = ref.watch(actuatorStatusStreamProvider);
+    final targetsAsync = ref.watch(farmControlTargetsProvider(farmId));
+    final actuatorStatusAsync = ref.watch(farmActuatorStatusProvider(farmId));
 
     return Card(
       child: Padding(
@@ -1068,7 +1073,7 @@ class _ActuatorStateCard extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   tooltip: 'Reload',
-                  onPressed: () => ref.refresh(controlTargetsFutureProvider),
+                  onPressed: () => ref.refresh(farmControlTargetsProvider(farmId)),
                 ),
               ],
             ),
