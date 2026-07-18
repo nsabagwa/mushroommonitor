@@ -101,32 +101,43 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   child: Column(
                     children: [
                       Container(
-                        width: 120,
-                        height: 120,
+                        width: 150,
+                        height: 150,
                         decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
+                          color: Colors.white,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: colorScheme.primary.withValues(alpha: 0.3),
+                              color:
+                                  colorScheme.primary.withValues(alpha: 0.35),
+                              blurRadius: 40,
+                              spreadRadius: 4,
+                              offset: const Offset(0, 0),
+                            ),
+                            BoxShadow(
+                              color:
+                                  colorScheme.primary.withValues(alpha: 0.25),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
                           ],
                         ),
-                        child: Icon(
-                          Icons.eco,
-                          size: 60,
-                          color: colorScheme.onPrimaryContainer,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Image.asset(
+                            'assets/icon/icon_foreground.png',
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 28),
                       Text(
                         'MushPi',
                         style:
                             Theme.of(context).textTheme.displaySmall?.copyWith(
                                   color: colorScheme.primary,
                                   fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
                                 ),
                       ),
                       const SizedBox(height: 8),
