@@ -722,14 +722,23 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasThingSpeak =
-        farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
+    final wifiDataAsync = ref.watch(farmEnvironmentalDataProvider(farm.id));
+    final hasThingSpeak =farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
     final thingSpeakAsync = hasThingSpeak
         ? ref.watch(thingSpeakProvider((
             channelId: farm.thingSpeakChannelId!,
             readApiKey: farm.thingSpeakReadApiKey!,
           )))
         : const AsyncValue<ThingSpeakReading>.loading();
+    
+    // Use Wifi data if available, fall back to ThingSpeak
+    final effectiveData = wifiDataAsync.maybeWhen(
+      data: (wifiData) => wifiData,
+      orElse: () => thingSpeakAsync.maybeWhen(
+        data: (thingSpeakData) => thingSpeakData,
+        orElse: () => null,
+      ),
+    );
 
     return Card(
       elevation: 2,
@@ -738,12 +747,11 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header – always shows "Remote" and timestamp
-            _buildHeader(context, thingSpeakAsync),
+            // Header
+            _buildHeader(context, effectiveData),
             const SizedBox(height: 16),
 
-            // ThingSpeak data
-            _buildThingSpeakData(context, thingSpeakAsync),
+            _buildFarmData(context, effectiveData),
 
             const SizedBox(height: 16),
             // Chart navigation button
@@ -773,8 +781,11 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(
-      BuildContext context, AsyncValue<ThingSpeakReading> thingSpeakAsync) {
+  Widget _buildHeader(BuildContext context, dynamic effectiveData) {
+
+    final isLocal = farm.wifiHost != null;
+    final isRemote = farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
+
     return Row(
       children: [
         Expanded(
@@ -785,23 +796,25 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
                 ),
           ),
         ),
-        // "Remote" badge
+      
+
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.blue.withValues(alpha: 0.15),
+            color: isLocal ? Colors.green.withValues(alpha: 0.15) : isRemote ? Colors.blue.withValues(alpha: 0.15) : Colors.grey,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue, width: 1.5),
+            border: Border.all(color: isLocal ? Colors.green : Colors.blue, width: 1.5),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.cloud, size: 16, color: Colors.blue),
-              SizedBox(width: 6),
+              Icon(
+                isLocal? Icons.lan : Icons.cloud, size: 16, color: isLocal ? Colors.green : Colors.blue),
+              const SizedBox(width: 6),
               Text(
-                'Remote',
+                isLocal ? 'Local' : 'Remote',
                 style: TextStyle(
-                  color: Colors.blue,
+                  color: isLocal ? Colors.green : isRemote ? Colors.blue : Colors.grey,
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
                 ),
@@ -811,23 +824,22 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
         ),
         const SizedBox(width: 8),
         // Timestamp
-        thingSpeakAsync.when(
-          data: (reading) => _TimestampChip(timestamp: reading.time),
-          loading: () => const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          error: (_, __) => const SizedBox.shrink(),
-        ),
+        effectiveData != null ? _TimestampChip(timestamp: effectiveData is ThingSpeakReading ? effectiveData.time :effectiveData.timestamp) : const SizedBox(width: 16, height: 16),
       ],
     );
   }
 
-  Widget _buildThingSpeakData(
-      BuildContext context, AsyncValue<ThingSpeakReading> asyncReading) {
-    return asyncReading.when(
-      data: (reading) => Column(
+// This widget handles all 3 situations: ThingSpeak(Remote), Live data (Wifi/BLE) (Online), and Local data (Offline)
+  Widget _buildFarmData(
+      BuildContext context, dynamic effectiveData) {
+    return effectiveData.when(
+      data: (reading) {
+        final temp = reading is ThingSpeakReading ? reading.temperature : reading.temperatureC;
+        final humidity = reading is ThingSpeakReading ? reading.humidity : reading.relativeHumidity;
+        final co2 = reading is ThingSpeakReading ? reading.co2 : reading.co2Ppm;
+        final light = reading is ThingSpeakReading ? reading.light : reading.lightRaw;
+      
+      return Column(
         children: [
           Row(
             children: [
@@ -835,16 +847,16 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
                 child: _EnvironmentalMetric(
                   icon: Icons.thermostat,
                   label: 'Temperature',
-                  value: '${reading.temperature?.toStringAsFixed(1) ?? "--"}°C',
-                  color: _getTemperatureColor(reading.temperature ?? 20),
+                  value: '${temp?.toStringAsFixed(1) ?? "--"}°C',
+                  color: _getTemperatureColor(temp ?? 20),
                 ),
               ),
               Expanded(
                 child: _EnvironmentalMetric(
                   icon: Icons.water_drop,
                   label: 'Humidity',
-                  value: '${reading.humidity?.toStringAsFixed(0) ?? "--"}%',
-                  color: _getHumidityColor(reading.humidity ?? 70),
+                  value: '${humidity?.toStringAsFixed(0) ?? "--"}%',
+                  color: _getHumidityColor(humidity ?? 70),
                 ),
               ),
             ],
@@ -856,22 +868,23 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
                 child: _EnvironmentalMetric(
                   icon: Icons.air,
                   label: 'CO₂',
-                  value: '${reading.co2 ?? "--"} ppm',
-                  color: _getCO2Color(reading.co2?.toInt() ?? 0),
+                  value: '${co2 ?? "--"} ppm',
+                  color: _getCO2Color(co2?.toInt() ?? 0),
                 ),
               ),
               Expanded(
                 child: _EnvironmentalMetric(
                   icon: Icons.light_mode,
                   label: 'Light',
-                  value: '${reading.light ?? "--"} lx',
+                  value: '${light ?? "--"} lx',
                   color: Colors.amber,
                 ),
               ),
             ],
           ),
         ],
-      ),
+      );
+      },
       loading: () => const Center(
         child: Padding(
           padding: EdgeInsets.all(32.0),
@@ -882,7 +895,7 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Text(
-            'Could not load remote data',
+            'Could not load remote, local or online data',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.error,
                 ),

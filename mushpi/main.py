@@ -1,13 +1,15 @@
 # main.py
 from app.core import sensors, control, stage, ble_gatt
-from app.core.control import ControlSystem
+from app.core.control import ControlSystem, RelayState
 from app.core.stage import StageManager, StageMode
 from app.core.config import config
 from app.database.manager import DatabaseManager
 from app.models.dataclasses import Threshold
+from flask import Flask, jsonify, request
 import logging
 import time
 import json
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +18,70 @@ db = DatabaseManager()
 control_system = ControlSystem()
 stage_manager = StageManager()
 
+http_app = Flask(__name__)
+
+@http_app.route('/api/data', methods=['GET'])
+def http_get_api_data():
+    sensor_data = get_sensor_data() or {}
+    control_data = get_control_data() or {}
+    return jsonify({
+        'temp': sensor_data.get('temperature'),
+        'humidity': sensor_data.get('humidity'),
+        'co2': sensor_data.get('co2'),
+        'lux': sensor_data.get('light'),
+        'fanRunning': control_data.get('fan', False),
+        'lightRunning': control_data.get('light', False),
+        'humidifierOn': control_data.get('mist', False),
+        'tecOn': control_data.get('heater', False)
+    })
+    
+@http_app.route('/control-targets', methods=['GET'])
+def http_get_control_targets():
+    return jsonify(get_control_targets())
+
+@http_app.route('/stage-state', methods=['GET'])
+def http_get_stage_state():
+    return jsonify(stage_manager.get_current_stage())
+
+@http_app.route('/status-flags', methods=['GET'])
+def http_get_status_flags():
+    return jsonify({'flags': 0})  # Placeholder for future status flags
+
+@http_app.route('/api/manual/toggle', methods=['POST'])
+def http_post_manual_toggle():
+    control_system.mode = control.ControlMode.MANUAL if control_system.mode == control.ControlMode.AUTOMATIC else control.ControlMode.AUTOMATIC
+    return jsonify({'status': 'ok'})
+
+@http_app.route('/api/manual/tec/toggle', methods=['POST'])
+def http_toggle_tec():
+    current_state = control_system.relay_manager.get_relay_state('heater')
+    control_system.relay_manager.set_relay('heater', RelayState.OFF if current_state == RelayState.ON else RelayState.ON)
+    return jsonify({'status': 'ok'})
+
+@http_app.route('/api/manual/humidifier/toggle', methods=['POST'])
+def http_toggle_humidifier():
+    current_state = control_system.relay_manager.get_relay_state('humidifier')
+    control_system.relay_manager.set_relay('humidifier', RelayState.OFF if current_state == RelayState.ON else RelayState.ON)
+    return jsonify({'status': 'ok'})
+
+@http_app.route('/api/manual/fan/<int:value>', methods=['GET'])
+def http_set_fan(value):
+    control_system.relay_manager.set_relay('exhaust_fan', RelayState.ON if value > 0 else RelayState.OFF)
+    return jsonify({'status': 'ok'})
+
+@http_app.route('/api/manual/light/<int:value>', methods=['GET'])
+def http_set_light(value):
+    control_system.relay_manager.set_relay('grow_light', RelayState.ON if value > 0 else RelayState.OFF)
+    return jsonify({'status': 'ok'})
+
+def start_http_server():
+    """Start the Flask HTTP server in a separate thread"""
+    http_app.run(host='0.0.0.0', port=5000, debug=False)
+    
+if __name__ == "__main__":
+    # Start HTTP server in background thread
+    http_thread = threading.Thread(target=start_http_server, daemon=True)
+    http_thread.start()    
 
 def convert_stage_thresholds_to_threshold_objects(thresholds_dict: dict) -> dict:
     """Convert stage manager threshold dict to Threshold dataclass objects
