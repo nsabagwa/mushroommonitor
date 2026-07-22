@@ -628,6 +628,8 @@ class FarmRepository {
       id: farm.id,
       name: farm.name,
       deviceId: farm.deviceId, // nullable — fine now that model accepts String?
+      wifiHost: farm.wifiHost,
+      wifiPort: farm.wifiPort ?? 80,
       thingSpeakChannelId: farm.thingSpeakChannelId,
       thingSpeakReadApiKey: farm.thingSpeakReadApiKey,
       location: farm.location,
