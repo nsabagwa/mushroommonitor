@@ -53,13 +53,11 @@ final farmDeviceRepositoryProvider = FutureProvider.autoDispose.family<DeviceRep
   Future<void> markOnline() async {
     await farmOps.updateLastActive(farmId);
     ref.invalidate(activeFarmsProvider);
-    ref.invalidate(farmByIdProvider(farmId));
   }
 
   Future<void> markOffline() async {
     await farmOps.clearLastActive(farmId);
     ref.invalidate(activeFarmsProvider);
-    ref.invalidate(farmByIdProvider(farmId));
   }
 
   await markOnline();
