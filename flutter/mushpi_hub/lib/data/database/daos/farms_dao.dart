@@ -95,7 +95,11 @@ class FarmsDao extends DatabaseAccessor<AppDatabase> with _$FarmsDaoMixin {
   
   /// Link Wifi connection to farm
   Future<int> updateWifiHost(String farmId, String? host) async {
-    return (update(farms)..where((f) => f.id.equals(farmId))).write(FarmsCompanion(wifiHost: Value(host)));
-
+  final rows = await (update(farms)..where((f) => f.id.equals(farmId)))
+      .write(FarmsCompanion(wifiHost: Value(host)));
+  if (rows == 0) {
+    throw Exception('No farm found with id $farmId — wifiHost not saved');
   }
+  return rows;
+}
 }
