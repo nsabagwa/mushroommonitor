@@ -732,13 +732,8 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
         : const AsyncValue<ThingSpeakReading>.loading();
     
     // Use Wifi data if available, fall back to ThingSpeak
-    final effectiveData = wifiDataAsync.maybeWhen(
-      data: (wifiData) => wifiData,
-      orElse: () => thingSpeakAsync.maybeWhen(
-        data: (thingSpeakData) => thingSpeakData,
-        orElse: () => null,
-      ),
-    );
+    final bool isLocal = farm.wifiHost != null;
+    final AsyncValue<dynamic> effectiveAsync = isLocal ? wifiDataAsync : thingSpeakAsync;
 
     return Card(
       elevation: 2,
@@ -748,10 +743,10 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            _buildHeader(context, effectiveData),
+            _buildHeader(context, effectiveAsync),
             const SizedBox(height: 16),
 
-            _buildFarmData(context, effectiveData),
+            _buildFarmData(context, effectiveAsync),
 
             const SizedBox(height: 16),
             // Chart navigation button
@@ -781,7 +776,7 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, dynamic effectiveData) {
+  Widget _buildHeader(BuildContext context, AsyncValue<dynamic> effectiveAsync) {
 
     final isLocal = farm.wifiHost != null;
     final isRemote = farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
@@ -824,15 +819,23 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
         ),
         const SizedBox(width: 8),
         // Timestamp
-        effectiveData != null ? _TimestampChip(timestamp: effectiveData is ThingSpeakReading ? effectiveData.time :effectiveData.timestamp) : const SizedBox(width: 16, height: 16),
+        effectiveAsync.when(
+          data: (reading) => _TimestampChip(
+            timestamp: reading is ThingSpeakReading ? reading.time : reading.timestamp,),
+          loading: () => const SizedBox(
+            width: 16, height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          error: (_, __) => const SizedBox.shrink()
+        )
       ],
     );
   }
 
 // This widget handles all 3 situations: ThingSpeak(Remote), Live data (Wifi/BLE) (Online), and Local data (Offline)
   Widget _buildFarmData(
-      BuildContext context, dynamic effectiveData) {
-    return effectiveData.when(
+      BuildContext context, AsyncValue<dynamic> effectiveAsync) {
+    return effectiveAsync.when(
       data: (reading) {
         final temp = reading is ThingSpeakReading ? reading.temperature : reading.temperatureC;
         final humidity = reading is ThingSpeakReading ? reading.humidity : reading.relativeHumidity;

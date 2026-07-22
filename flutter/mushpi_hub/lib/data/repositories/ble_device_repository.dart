@@ -38,6 +38,13 @@ class BleDeviceRepository implements DeviceRepository {
       );
     }
 
+    // Already connected to this device via the shared singleton (most
+    // likely BLEConnectionManager's auto-reconnect) - reuse it instead
+    // of forcing a disconnect/reconnect cycle.
+    if (_repository.isConnected && _repository.connectedDevice?.remoteId.toString() == target.deviceId) {
+      return;
+      }
+
     var device = target.resolvedDevice as BluetoothDevice?;
 
     // No live scan object was handed in (e.g. reconnecting to a 
@@ -166,7 +173,13 @@ class BleDeviceRepository implements DeviceRepository {
   // ---- Lifecycle ----
 
   @override
-  void dispose() => _repository.dispose();
+  void dispose() {
+    /// This wraps the shared BLERepository singleton owned by
+    /// BLEConnectionManager - it doesn't own that instance, so
+    /// it must not dispose it. Doing so would close the singleton's
+    /// StreamControllers app-wide, not just for whichever screen
+    /// borrowed this wrapper.
+  }
 
   /// Wraps BLE-specific failures into [DeviceRepositoryException] so
   /// callers above this layer can catch one exception type regardless of

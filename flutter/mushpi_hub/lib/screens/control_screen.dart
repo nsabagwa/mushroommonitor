@@ -4,9 +4,10 @@ import 'dart:developer' as developer;
 
 import '../core/constants/ble_constants.dart';
 import '../core/utils/ble_serializer.dart';
-import '../providers/ble_provider.dart';
 import '../providers/current_farm_provider.dart';
 import '../providers/farms_provider.dart';
+import '../data/repositories/device_repository.dart';
+import '../providers/device_provider.dart';
 
 
 /// Control screen for managing environmental control parameters.
@@ -71,75 +72,75 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     });
 
     try {
-      final bleOps = ref.read(bleOperationsProvider);
+      final farmId = ref.read(selectedMonitoringFarmIdProvider);
+      if (farmId == null) {
+        throw DeviceRepositoryException('No farm selected');
+      }
+      final repository = await ref.read(farmDeviceRepositoryProvider(farmId).future);
 
       // Load current stage first
-      final stageState = await bleOps.readStageState();
-      if (stageState != null) {
+      final stageState = await repository.readStageState();
+      setState(() {
+        _currentSpecies = stageState.species;
+        _currentStage = stageState.stage;
+      });
+
+      developer.log(
+        '✅ Loaded current stage: ${stageState.species.displayName} - ${stageState.stage.displayName}',
+        name: 'mushpi.control_screen',
+      );
+
+      // Load stage thresholds for current stage
+      final thresholds = await repository.readStageThresholds(
+        stageState.species,
+        stageState.stage,
+      );
+
+      if (thresholds != null) {
+        // Use stage thresholds as initial values
         setState(() {
-          _currentSpecies = stageState.species;
-          _currentStage = stageState.stage;
+          if (thresholds.tempMin != null) _tempMin = thresholds.tempMin!;
+          if (thresholds.tempMax != null) _tempMax = thresholds.tempMax!;
+          if (thresholds.rhMin != null) _rhMin = thresholds.rhMin!;
+          if (thresholds.co2Max != null) _co2Max = thresholds.co2Max!;
+          if (thresholds.lightMode != null) {
+            _lightMode = thresholds.lightMode!;
+          }
+          if (thresholds.lightOnMinutes != null) {
+            _onMinutes = thresholds.lightOnMinutes!;
+          }
+          if (thresholds.lightOffMinutes != null) {
+            _offMinutes = thresholds.lightOffMinutes!;
+          }
+          if (thresholds.expectedDays != null) {
+            _expectedDays = thresholds.expectedDays!;
+          }
         });
 
         developer.log(
-          '✅ Loaded current stage: ${stageState.species.displayName} - ${stageState.stage.displayName}',
+          '✅ Loaded stage thresholds for current stage (expectedDays: $_expectedDays)',
           name: 'mushpi.control_screen',
         );
-
-        // Load stage thresholds for current stage
-        final thresholds = await bleOps.readStageThresholds(
-          stageState.species,
-          stageState.stage,
-        );
-
-        if (thresholds != null) {
-          // Use stage thresholds as initial values
-          setState(() {
-            if (thresholds.tempMin != null) _tempMin = thresholds.tempMin!;
-            if (thresholds.tempMax != null) _tempMax = thresholds.tempMax!;
-            if (thresholds.rhMin != null) _rhMin = thresholds.rhMin!;
-            if (thresholds.co2Max != null) _co2Max = thresholds.co2Max!;
-            if (thresholds.lightMode != null) {
-              _lightMode = thresholds.lightMode!;
-            }
-            if (thresholds.lightOnMinutes != null) {
-              _onMinutes = thresholds.lightOnMinutes!;
-            }
-            if (thresholds.lightOffMinutes != null) {
-              _offMinutes = thresholds.lightOffMinutes!;
-            }
-            if (thresholds.expectedDays != null) {
-              _expectedDays = thresholds.expectedDays!;
-            }
-          });
-
-          developer.log(
-            '✅ Loaded stage thresholds for current stage (expectedDays: $_expectedDays)',
-            name: 'mushpi.control_screen',
-          );
-        }
       }
 
       // Load current control targets (actual applied values)
-      final controlTargets = await bleOps.readControlTargets();
+      final controlTargets = await repository.readControlTargets();
 
-      if (controlTargets != null) {
-        setState(() {
-          _tempMin = controlTargets.tempMin;
-          _tempMax = controlTargets.tempMax;
-          _rhMin = controlTargets.rhMin;
-          _co2Max = controlTargets.co2Max;
-          _lightMode = controlTargets.lightMode;
-          _onMinutes = controlTargets.onMinutes;
-          _offMinutes = controlTargets.offMinutes;
-          _hasChanges = false;
-        });
+      setState(() {
+        _tempMin = controlTargets.tempMin;
+        _tempMax = controlTargets.tempMax;
+        _rhMin = controlTargets.rhMin;
+        _co2Max = controlTargets.co2Max;
+        _lightMode = controlTargets.lightMode;
+        _onMinutes = controlTargets.onMinutes;
+        _offMinutes = controlTargets.offMinutes;
+        _hasChanges = false;
+      });
 
-        developer.log(
-          '✅ Loaded control settings: ${controlTargets.toString()}',
-          name: 'mushpi.control_screen',
-        );
-      }
+      developer.log(
+        '✅ Loaded control settings: ${controlTargets.toString()}',
+        name: 'mushpi.control_screen',
+      );
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load settings: $e';
@@ -181,7 +182,11 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     });
 
     try {
-      final bleOps = ref.read(bleOperationsProvider);
+      final farmId = ref.read(selectedMonitoringFarmIdProvider);
+      if (farmId == null) {
+        throw DeviceRepositoryException('No farm selected');
+      }
+      final repository = await ref.read(farmDeviceRepositoryProvider(farmId).future);
 
       // Write control targets
       final controlTargets = ControlTargetsData(
@@ -194,7 +199,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
         offMinutes: _offMinutes,
       );
 
-      await bleOps.writeControlTargets(controlTargets);
+      await repository.writeControlTargets(controlTargets);
 
       developer.log(
         '✅ Applied control settings: ${controlTargets.toString()}',
@@ -216,7 +221,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
           expectedDays: _expectedDays,
         );
 
-        final thresholdSuccess = await bleOps.writeStageThresholds(thresholds);
+        final thresholdSuccess = await repository.writeStageThresholds(thresholds);
 
         if (thresholdSuccess) {
           developer.log(
@@ -245,7 +250,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
         if (_heaterOverride) overrideBits |= 0x08;
         if (_disableAuto) overrideBits |= 0x80;
 
-        await bleOps.writeOverrideBits(overrideBits);
+        await repository.writeOverrideBits(overrideBits);
 
         developer.log(
           '✅ Applied override bits: 0x${overrideBits.toRadixString(16)}',
@@ -294,7 +299,12 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedFarmId = ref.watch(selectedMonitoringFarmIdProvider);
-    final isConnected = ref.watch(bleRepositoryProvider).isConnected;
+    final isConnected = selectedFarmId == null
+      ? false 
+      : ref.watch(farmConnectionStateProvider(selectedFarmId)).maybeWhen(
+        data: (state) => state == DeviceConnectionState.connected,
+        orElse: () => false,
+    );
 
     return Scaffold(
       appBar: AppBar(
