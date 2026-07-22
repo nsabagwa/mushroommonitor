@@ -69,3 +69,4 @@ flutter:
   assets:
     - .env
     - android/app/src/main/res/drawable/
+    - shorebird.yaml
