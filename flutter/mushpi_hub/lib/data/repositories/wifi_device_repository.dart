@@ -35,6 +35,7 @@ class WifiDeviceRepository implements DeviceRepository {
   DeviceConnectionState _state = DeviceConnectionState.disconnected;
   int _consecutivePollFailures = 0;
   static const int _pollFailureThreshold = 3;
+  bool _pollInFlight = false;
 
   final _connectionStateController =
       StreamController<DeviceConnectionState>.broadcast();
@@ -122,7 +123,10 @@ class WifiDeviceRepository implements DeviceRepository {
 
   void _startPolling() {
     _pollTimer?.cancel();
+
     _pollTimer = Timer.periodic(_pollInterval, (_) async {
+      if (_pollInFlight) return; // previous request still in flight - skip this tick
+      _pollInFlight = true;
       try {
         final json = await _get('/api/data');
         _environmentalDataController.add(_environmentalReadingFromApiData(json));
@@ -154,6 +158,8 @@ class WifiDeviceRepository implements DeviceRepository {
           _pollTimer = null;
           _setState(DeviceConnectionState.disconnected);
         }
+      } finally {
+        _pollInFlight = false;
       }
     });
   }
