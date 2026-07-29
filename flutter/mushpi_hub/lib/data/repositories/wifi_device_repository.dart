@@ -1,3 +1,5 @@
+// ignore_for_file: unused_field
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -222,7 +224,7 @@ class WifiDeviceRepository implements DeviceRepository {
   // The toggle endpoints return plain "ON/OFF" strings, not JSON.
   // Separate helper so _get/_post don't need to special-case response parsing.
   Future<void> _postText(String path) async {
-    final response = await _client.post(_uri(path)).timeout(_requestTimeout);
+    final response = await http.post(_uri(path)).timeout(_requestTimeout);
     _checkStatus(response);
   }
 
@@ -285,7 +287,6 @@ class WifiDeviceRepository implements DeviceRepository {
     _environmentalDataController.close();
     _statusFlagsController.close();
     _actuatorStatusController.close();
-    _client.close();
   }
 
   // ---- HTTP + JSON helpers ----
@@ -303,8 +304,11 @@ class WifiDeviceRepository implements DeviceRepository {
     String path, {
     Map<String, String>? query,
   }) async {
+    /// A fresh client per call, not the shared _client = the controller
+    /// sends "Connection: close" on every response and reusing a pooled
+    /// connection against that was producing 400s on manual commands
     final response =
-        await _client.get(_uri(path, query)).timeout(_requestTimeout);
+        await http.get(_uri(path, query)).timeout(_requestTimeout);
     _checkStatus(response);
     if (response.body.isEmpty) return {};
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -314,7 +318,7 @@ class WifiDeviceRepository implements DeviceRepository {
     String path,
     Map<String, dynamic> body,
   ) async {
-    final response = await _client
+    final response = await http
         .post(
           _uri(path),
           headers: {'Content-Type': 'application/json'},

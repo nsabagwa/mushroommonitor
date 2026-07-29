@@ -398,6 +398,12 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
               orElse: () => false,
             );
 
+            ref.listen<String?>(selectedMonitoringFarmIdProvider, (previous, next) {
+              if (next != null && next !=previous) {
+                _loadCurrentSettings();
+              }
+            });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Environmental Control'),
