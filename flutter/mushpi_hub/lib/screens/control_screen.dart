@@ -9,7 +9,6 @@ import '../providers/farms_provider.dart';
 import '../data/repositories/device_repository.dart';
 import '../providers/device_provider.dart';
 
-
 /// Control screen for managing environmental control parameters.
 ///
 /// Allows users to adjust:
@@ -49,6 +48,10 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
   bool _heaterOverride = false;
   bool _disableAuto = false;
 
+  // Manual-mode state (Wifi farms only)
+  double _fanPwm = 0;
+  double _lightPwm = 0;
+
   // UI state
   bool _isLoading = false;
   bool _hasChanges = false;
@@ -76,7 +79,16 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
       if (farmId == null) {
         throw DeviceRepositoryException('No farm selected');
       }
-      final repository = await ref.read(farmDeviceRepositoryProvider(farmId).future);
+      final farm = await ref.read(farmByIdProvider(farmId).future);
+      if (farm?.wifiHost != null) {
+        /// Wifi farms don't support automatic mode settings over HTTP yet=
+        /// so theres is nothing to preload here. the manaul panel reads actuator state
+        /// live via farmActuatorStatusProvider instead
+        return;
+      }
+
+      final repository =
+          await ref.read(farmDeviceRepositoryProvider(farmId).future);
 
       // Load current stage first
       final stageState = await repository.readStageState();
@@ -186,7 +198,8 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
       if (farmId == null) {
         throw DeviceRepositoryException('No farm selected');
       }
-      final repository = await ref.read(farmDeviceRepositoryProvider(farmId).future);
+      final repository =
+          await ref.read(farmDeviceRepositoryProvider(farmId).future);
 
       // Write control targets
       final controlTargets = ControlTargetsData(
@@ -221,7 +234,8 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
           expectedDays: _expectedDays,
         );
 
-        final thresholdSuccess = await repository.writeStageThresholds(thresholds);
+        final thresholdSuccess =
+            await repository.writeStageThresholds(thresholds);
 
         if (thresholdSuccess) {
           developer.log(
@@ -296,15 +310,93 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
     }
   }
 
+  Future<void> _setFanPwm(int value) async {
+    final farmId = ref.read(selectedMonitoringFarmIdProvider);
+    if (farmId == null) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final repository =
+          await ref.read(farmDeviceRepositoryProvider(farmId).future);
+      await repository.setFanPwm(value);
+    } catch (e) {
+      setState(() => _errorMessage = 'Failed to set fan PWM: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _setLightPwm(int value) async {
+    final farmId = ref.read(selectedMonitoringFarmIdProvider);
+    if (farmId == null) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final repository =
+          await ref.read(farmDeviceRepositoryProvider(farmId).future);
+      await repository.setLightPwm(value);
+    } catch (e) {
+      setState(() => _errorMessage = 'Failed to set mist PWM: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _toggleTec() async {
+    final farmId = ref.read(selectedMonitoringFarmIdProvider);
+    if (farmId == null) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final repository =
+          await ref.read(farmDeviceRepositoryProvider(farmId).future);
+      await repository.toggleTec();
+    } catch (e) {
+      setState(() => _errorMessage = 'Failed to toggle TEC: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _toggleHumidifier() async {
+    final farmId = ref.read(selectedMonitoringFarmIdProvider);
+    if (farmId == null) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final repository =
+          await ref.read(farmDeviceRepositoryProvider(farmId).future);
+      await repository.toggleHumidifier();
+    } catch (e) {
+      setState(() => _errorMessage = 'Failed to toggle humidifier: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedFarmId = ref.watch(selectedMonitoringFarmIdProvider);
     final isConnected = selectedFarmId == null
-      ? false 
-      : ref.watch(farmConnectionStateProvider(selectedFarmId)).maybeWhen(
-        data: (state) => state == DeviceConnectionState.connected,
-        orElse: () => false,
-    );
+        ? false
+        : ref.watch(farmConnectionStateProvider(selectedFarmId)).maybeWhen(
+              data: (state) => state == DeviceConnectionState.connected,
+              orElse: () => false,
+            );
+    final isWifiFarm = selectedFarmId == null
+        ? false
+        : ref.watch(farmByIdProvider(selectedFarmId)).maybeWhen(
+              data: (farm) => farm?.wifiHost != null,
+              orElse: () => false,
+            );
 
     return Scaffold(
       appBar: AppBar(
@@ -319,7 +411,9 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
       ),
       body: selectedFarmId == null
           ? _buildFarmSelector(context)
-          : _buildControlPanel(context, isConnected),
+          : isWifiFarm
+              ? _buildManualControlPanel(context, isConnected, selectedFarmId)
+              : _buildControlPanel(context, isConnected),
     );
   }
 
@@ -802,6 +896,172 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  /// Manual-only control panel for Wifi farms. The ESP32's HTTP API only
+  /// exposes manual overrides right now- no stage/threshold/target support
+  /// over Wifi yet - so this deliberately doesn't show the automatic-mode
+  /// sliders _buildControlPanel does. Remove this fork once fimeware adds
+  /// the missing endpoints (see readStageState/readControlTargets/etc. in
+  /// wifi_device_repository.dart).
+  Widget _buildManualControlPanel(
+      BuildContext context, bool isConnected, String farmId) {
+    final actuatorAsync = ref.watch(farmActuatorStatusProvider(farmId));
+    final canAct = isConnected && !_isLoading;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isConnected)
+            Card(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    Icon(Icons.wifi_off,
+                        color: Theme.of(context).colorScheme.onErrorContainer),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Not Connected to device. Connect to a farm to adjust settings',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onErrorContainer,
+                                ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Card(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                "This farm connects over Wifi, which currently only supports manual control."
+                " Automatic stage-based control is available over Bluetooth for now.",
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer),
+              ),
+            ),
+          ),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 8),
+            Card(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          _buildSection(
+            context,
+            title: 'Fan',
+            icon: Icons.air,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Level shown reflects your last request not the device current setting. "
+                  "Wifi mode can't read it back yet.",
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                _buildSlider(
+                  label: "Speed",
+                  value: _fanPwm,
+                  min: 0,
+                  max: 255,
+                  divisions: 255,
+                  unit: '',
+                  onChanged: (value) => setState(() => _fanPwm = value),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    onPressed:
+                        canAct ? () => _setFanPwm(_fanPwm.round()) : null,
+                    child: const Text('Set fan speed'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildSection(
+            context,
+            title: 'Grow Light',
+            icon: Icons.lightbulb,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSlider(
+                  label: "Brightness",
+                  value: _lightPwm,
+                  min: 0,
+                  max: 255,
+                  divisions: 255,
+                  unit: '',
+                  onChanged: (value) => setState(() => _lightPwm = value),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    onPressed:
+                        canAct ? () => _setLightPwm(_lightPwm.round()) : null,
+                    child: const Text('Set light brightness level'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildSection(
+            context,
+            title: 'TEC (Cooler)',
+            icon: Icons.ac_unit_sharp,
+            child: actuatorAsync.when(
+              data: (status) => SwitchListTile(
+                title: const Text('TEC'),
+                subtitle: Text(status.heaterOn ? 'ON' : 'OFF'),
+                value: status.heaterOn,
+                onChanged: canAct ? (_) => _toggleTec() : null,
+              ),
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) => const Text("Status unavailable"),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildSection(
+            context,
+            title: 'Humidifier',
+            icon: Icons.water_drop,
+            child: actuatorAsync.when(
+              data: (status) => SwitchListTile(
+                title: const Text('Humidifier'),
+                subtitle: Text(status.mistOn ? 'ON' : 'OFF'),
+                value: status.mistOn,
+                onChanged: canAct ? (_) => _toggleHumidifier() : null,
+              ),
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) => const Text("Status unavailable"),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
