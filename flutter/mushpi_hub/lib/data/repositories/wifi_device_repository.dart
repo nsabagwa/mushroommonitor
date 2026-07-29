@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 
@@ -56,13 +55,20 @@ class WifiDeviceRepository implements DeviceRepository {
     );
   }
 
+  bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is int) return value != 0;
+    if (value is String) return value == 'true' || value == '1';
+    throw FormatException("Expected a bool-like value, got ${value.runtimeType}: $value");
+  }
+
   ActuatorStatusData? _actuatorStatusFromApiData(Map<String, dynamic> json) {
     if (json.isEmpty) return null;
     return ActuatorStatusData(
-      lightOn: json['lightRunning'] as bool,
-      fanOn: json['fanRunning'] as bool,
-      mistOn: json['humidifierOn'] as bool,
-      heaterOn: json['tecOn'] as bool,
+      lightOn: _asBool(json['lightRunning']),
+      fanOn: _asBool(json['fanRunning']),
+      mistOn: _asBool(json['humidifierOn']),
+      heaterOn: _asBool(json['tecOn']),
       fanReasonCode: 0,
       mistReasonCode: 0,
       lightReasonCode: 0,
@@ -134,26 +140,16 @@ class WifiDeviceRepository implements DeviceRepository {
         if (actuator != null) _actuatorStatusController.add(actuator);
         // Successful poll; reset failure counter.
         _consecutivePollFailures = 0;
-      } catch (e, stackTrace) {
+      } catch (e) {
         // Swallow poll errors so one flaky cycle doesn't crash the timer.
         // A device that's genuinely gone stays silent on these streams;
         // callers doing an explicit read/write still get a real failure.
         // (a "missed N heartbeats -> disconnected" watchdog) once this is
         // running against real hardware instead of mocks.
-        developer.log(
-          'Wi-Fi poll cycle failed',
-          name: 'WifiDeviceRepository',
-          error: e,
-          stackTrace: stackTrace,
-          level: 900,
-        );
+        print("[WifiDeviceRepository] Poll cycle failed: $e");
         _consecutivePollFailures++;
         if (_consecutivePollFailures >= _pollFailureThreshold) {
-          developer.log(
-            'Wi-Fi poll failure threshold reached; marking disconnected',
-            name: 'WifiDeviceRepository',
-            level: 900,
-          );
+          print("[WifiDeviceRepository] Too many poll failures; disconnecting.");
           _pollTimer?.cancel();
           _pollTimer = null;
           _setState(DeviceConnectionState.disconnected);

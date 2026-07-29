@@ -41,7 +41,12 @@ final farmDeviceRepositoryProvider = FutureProvider.autoDispose.family<DeviceRep
   }
 
   ref.onDispose(repository.dispose);
-  await repository.connect(target);
+  try {
+    await repository.connect(target);
+    } catch (e) {
+      print('❌ farmDeviceRepositoryProvider: connect() failed for farm $farmId — $e');
+      rethrow;
+    }
 
   // Keep farm.lastActive fresh while this repository has a live
   // connection, so a farm shows 'online' the same way BLE farms already

@@ -121,5 +121,7 @@ class DeviceRepositoryException implements Exception {
   DeviceRepositoryException(this.message, {this.cause});
 
   @override
-  String toString() => 'DeviceRepositoryException: $message';
+  String toString() => cause != null
+      ? 'DeviceRepositoryException: $message (cause: $cause)'
+      : 'DeviceRepositoryException: $message';
 }
