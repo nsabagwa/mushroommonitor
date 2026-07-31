@@ -215,16 +215,23 @@ class WifiDeviceRepository implements DeviceRepository {
 
   @override
   Future<void> setFanPwm(int value) =>
-      _guard(() => _get('/api/manual/fan/$value'));
+      _guard(() => _getText('/api/manual/fan/$value'));
 
   @override
   Future<void> setLightPwm(int value) =>
-      _guard(() => _get('/api/manual/light/$value'));
+      _guard(() => _getText('/api/manual/light/$value'));
 
   // The toggle endpoints return plain "ON/OFF" strings, not JSON.
   // Separate helper so _get/_post don't need to special-case response parsing.
   Future<void> _postText(String path) async {
     final response = await http.post(_uri(path)).timeout(_requestTimeout);
+    _checkStatus(response);
+  }
+
+  /// Fan/Light manual PWM endpoints also return plain text ("OK"), not JSON-
+  /// same deal as _postText above, just for GET
+  Future<void> _getText(String path) async {
+    final response = await http.get(_uri(path)).timeout(_requestTimeout);
     _checkStatus(response);
   }
 

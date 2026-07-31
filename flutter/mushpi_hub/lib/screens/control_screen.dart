@@ -51,6 +51,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
   // Manual-mode state (Wifi farms only)
   double _fanPwm = 0;
   double _lightPwm = 0;
+  bool _wifiManualModeEnabled = false; // no readback from firmware - UI-tracked only
 
   // UI state
   bool _isLoading = false;
@@ -377,6 +378,25 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
       await repository.toggleHumidifier();
     } catch (e) {
       setState(() => _errorMessage = 'Failed to toggle humidifier: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _toggleWifiManualMode(bool enable) async {
+    final farmId = ref.read(selectedMonitoringFarmIdProvider);
+    if (farmId == null) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final repository =
+          await ref.read(farmDeviceRepositoryProvider(farmId).future);
+      await repository.toggleManualMode();
+      setState(() => _wifiManualModeEnabled = enable);
+    } catch (e) {
+      setState(() => _errorMessage = 'Failed to toggle manual mode on Wifi: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -915,6 +935,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
       BuildContext context, bool isConnected, String farmId) {
     final actuatorAsync = ref.watch(farmActuatorStatusProvider(farmId));
     final canAct = isConnected && !_isLoading;
+    final canControlActuators = canAct && _wifiManualModeEnabled;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -959,6 +980,15 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          Card(
+            child: SwitchListTile(
+              title: const Text('Manual Mode'),
+              subtitle: const Text('Enable manual control over Wifi'),
+              value: _wifiManualModeEnabled,
+              onChanged: canAct ? _toggleWifiManualMode : null,
+            ),
+          ),
           if (_errorMessage != null) ...[
             const SizedBox(height: 8),
             Card(
@@ -999,7 +1029,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
                   alignment: Alignment.centerRight,
                   child: FilledButton(
                     onPressed:
-                        canAct ? () => _setFanPwm(_fanPwm.round()) : null,
+                        canControlActuators ? () => _setFanPwm(_fanPwm.round()) : null,
                     child: const Text('Set fan speed'),
                   ),
                 ),
@@ -1027,7 +1057,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
                   alignment: Alignment.centerRight,
                   child: FilledButton(
                     onPressed:
-                        canAct ? () => _setLightPwm(_lightPwm.round()) : null,
+                        canControlActuators ? () => _setLightPwm(_lightPwm.round()) : null,
                     child: const Text('Set light brightness level'),
                   ),
                 ),
@@ -1044,7 +1074,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
                 title: const Text('TEC'),
                 subtitle: Text(status.heaterOn ? 'ON' : 'OFF'),
                 value: status.heaterOn,
-                onChanged: canAct ? (_) => _toggleTec() : null,
+                onChanged: canControlActuators ? (_) => _toggleTec() : null,
               ),
               loading: () => const LinearProgressIndicator(),
               error: (_, __) => const Text("Status unavailable"),
@@ -1060,7 +1090,7 @@ class _ControlScreenState extends ConsumerState<ControlScreen> {
                 title: const Text('Humidifier'),
                 subtitle: Text(status.mistOn ? 'ON' : 'OFF'),
                 value: status.mistOn,
-                onChanged: canAct ? (_) => _toggleHumidifier() : null,
+                onChanged: canControlActuators ? (_) => _toggleHumidifier() : null,
               ),
               loading: () => const LinearProgressIndicator(),
               error: (_, __) => const Text("Status unavailable"),
