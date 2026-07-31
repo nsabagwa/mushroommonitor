@@ -1,3 +1,5 @@
+// ignore_for_file: unused_field
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -416,9 +418,10 @@ class _LanCardState extends ConsumerState<_LanCard> {
     try {
       await repo.connect(WifiDeviceTarget(host));
       final reading = await repo.readEnvironmentalData();
+      await _saveHost(host);
       setState(() {
         _testPassed = true;
-        _testResult = 'Connected! Temp: ${reading.temperatureC}°C';
+        _testResult = 'Connected and Saved! Temp: ${reading.temperatureC}°C';
       });
     } catch (e) {
       setState(() {
@@ -431,24 +434,19 @@ class _LanCardState extends ConsumerState<_LanCard> {
     }
   }
 
-  Future<void> _saveHost() async {
+  Future<void> _saveHost(String host) async {
     setState(() => _isSaving = true);
     try {
       final ops = ref.read(farmOperationsProvider);
-      final host = _hostController.text.trim();
       await ops.updateWifiHost(
           farmId: widget.farmId, host: host.isEmpty ? null : host);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Wi-Fi address saved'),
-            backgroundColor: Colors.green));
-      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Failed to save: $e'),
-            backgroundColor: Colors.red));
-      }
+        setState(() {
+          _testPassed = false;
+          _testResult = 'Connected, but Failed to save: $e';
+        }); 
+        }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -488,18 +486,6 @@ class _LanCardState extends ConsumerState<_LanCard> {
                     : const Text('Test'),
               ),
               const SizedBox(width: 12),
-              if (_testPassed)
-                ElevatedButton(
-                  onPressed: _isSaving ? null : _saveHost,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Text('Save'),
-                ),
             ]),
             if (_testResult != null) ...[
               const SizedBox(height: 8),
