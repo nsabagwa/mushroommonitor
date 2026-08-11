@@ -61,7 +61,7 @@ final farmDeviceRepositoryProvider = FutureProvider.autoDispose.family<DeviceRep
     const minSaveInterval = Duration(seconds: 5);
     wifiReadingSubscription = repository.environmentalDataStream.listen((reading) async {
       final now = DateTime.now();
-      if (lastReadingSave == null && now.difference(lastReadingSave!) < minSaveInterval) {
+      if (lastReadingSave != null && now.difference(lastReadingSave!) < minSaveInterval) {
         return;
       }
       lastReadingSave = now;
