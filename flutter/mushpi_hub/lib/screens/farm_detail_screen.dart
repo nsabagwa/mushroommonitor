@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mushpi_hub/providers/thingspeak_provider.dart';
 import 'dart:developer' as developer;
+import 'dart:async';
 
 import '../providers/current_farm_provider.dart';
 import '../data/models/farm.dart';
@@ -559,7 +560,7 @@ class _ThingSpeakCardState extends ConsumerState<_ThingSpeakCard> {
     } catch (e) {
       setState(() {
         _testPassed = false;
-        _testResult = 'Failed: $e';
+        _testResult = e is TimeoutException ? "Failed: No internet reached ThingSpeak. If your phone is connected to the ESP32's own LAN, switch to a network with internet access first then retry." : 'Failed: $e';
       });
     } finally {
       setState(() => _isTesting = false);
