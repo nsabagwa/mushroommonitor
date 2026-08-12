@@ -34,7 +34,7 @@ final farmDeviceRepositoryProvider = FutureProvider.autoDispose.family<DeviceRep
     // Untested path today — routing a BLE farm through here means a
     // second thing calling .connect() on the same bleRepositoryProvider
     // singleton the existing auto-reconnect flow already manages. Don't
-    // exercise this branch until your groupmate's confirmed it won't
+    // exercise this branch until your teammates confirm it won't
     // fight that flow. Flag it to them before anything touches this.
     repository = BleDeviceRepository(ref.watch(bleRepositoryProvider));
     target = BleDeviceTarget(farm.deviceId!);
