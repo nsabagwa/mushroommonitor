@@ -5,9 +5,14 @@ import 'dart:developer' as developer;
 
 import '../core/constants/ble_constants.dart';
 import '../core/utils/ble_serializer.dart';
+
 import '../providers/current_farm_provider.dart';
 import '../providers/farms_provider.dart';
 import '../providers/ble_provider.dart';
+import '../providers/device_provider.dart';
+
+import '../data/repositories/device_repository.dart';
+
 import '../app.dart' show routeObserver;
 
 /// Stage Configuration Wizard
@@ -80,6 +85,11 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         'co2Max': TextEditingController(),
         'lightOnTime': TextEditingController(text: '08:00'),
         'lightOffTime': TextEditingController(text: '20:00'),
+        // Chart colour-coding only - never sent to the device
+        'co2ColorMin': TextEditingController(text: '0'),
+        'rhColorMax': TextEditingController(text: '100'),
+        'lightColorMax': TextEditingController(text: '100'),
+        'lightColorMin': TextEditingController(text: '0'),
       };
     }
 
@@ -194,6 +204,19 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       _isLoading = true;
       _errorMessage = null;
     });
+
+    final selectedFarmId = ref.read(selectedMonitoringFarmIdProvider);
+    if (selectedFarmId != null)  {
+      final farm = await ref.read(farmByIdProvider(selectedFarmId).future);
+      final colorRanges = farm?.metadata?['colorRanges'] as Map<String, dynamic>?;
+      for (var stage in GrowthStage.values) {
+        final saved = colorRanges?[stage.name] as Map<String, dynamic>?;
+        _controllers[stage]!['co2ColorMin']!.text = ((saved?['co2'] as Map?)?['min'] as num ?)?.toString() ?? '0';
+        _controllers[stage]!['rhColorMax']!.text = ((saved?['humidity'] as Map?)?['max'] as num ?)?.toString() ?? '100';
+        _controllers[stage]!['lightColorMin']!.text = ((saved?['light'] as Map?)?['min'] as num ?)?.toString() ?? '0';
+        _controllers[stage]!['lightColorMax']!.text = ((saved?['light'] as Map?)?['max'] as num ?)?.toString() ?? '100';
+      }
+    }
 
     try {
       // Check connection state first - use direct property instead of stream
@@ -349,12 +372,9 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
 
   /// Submit all settings
   Future<void> _submitAllSettings() async {
-    // Validate all stages
     final validationError = _validateAllStages();
     if (validationError != null) {
-      setState(() {
-        _errorMessage = validationError;
-      });
+      setState(() => _errorMessage = validationError);
       return;
     }
 
@@ -364,10 +384,82 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       _successMessage = null;
     });
 
+    final selectedFarmId = ref.read(selectedMonitoringFarmIdProvider);
+    if (selectedFarmId == null) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'No farm selected.';
+      });
+      return;
+    }
+
+    // 1. Always save colour-coding ranges + current stage locally.
+    //    This never requires a device connection.
+    try {
+      final farm = await ref.read(farmByIdProvider(selectedFarmId).future);
+      final existingMetadata = farm?.metadata ?? <String, dynamic>{};
+
+      final colorRanges = <String, dynamic>{};
+      for (var stage in [
+        GrowthStage.incubation,
+        GrowthStage.pinning,
+        GrowthStage.fruiting,
+      ]) {
+        final c = _controllers[stage]!;
+        final tempMin = double.tryParse(c['tempMin']!.text);
+        final tempMax = double.tryParse(c['tempMax']!.text);
+        final rhMin = double.tryParse(c['rhMin']!.text);
+        final rhMax = double.tryParse(c['rhColorMax']!.text);
+        final co2Min = double.tryParse(c['co2ColorMin']!.text);
+        final co2Max = double.tryParse(c['co2Max']!.text);
+        final lightMin = double.tryParse(c['lightColorMin']!.text);
+        final lightMax = double.tryParse(c['lightColorMax']!.text);
+
+        colorRanges[stage.name] = {
+          if (tempMin != null && tempMax != null)
+            'temp': {'min': tempMin, 'max': tempMax},
+          if (rhMin != null && rhMax != null)
+            'humidity': {'min': rhMin, 'max': rhMax},
+          if (co2Min != null && co2Max != null)
+            'co2': {'min': co2Min, 'max': co2Max},
+          if (lightMin != null && lightMax != null)
+            'light': {'min': lightMin, 'max': lightMax},
+        };
+      }
+
+      await ref.read(farmOperationsProvider).updateFarm(
+        id: selectedFarmId,
+        metadata: {
+          ...existingMetadata,
+          'colorRanges': colorRanges,
+          'currentGrowthStage': _currentStage.id,
+        },
+      );
+    } catch (e) {
+      developer.log(
+        '❌ Failed to save colour-coding ranges: $e',
+        name: 'mushpi.stage_wizard',
+        error: e,
+      );
+      // Non-fatal — fall through and still try the device push.
+    }
+
+    // 2. Push to the physical device, if the transport supports it.
+    final farm = await ref.read(farmByIdProvider(selectedFarmId).future);
+    if (farm?.wifiHost != null) {
+      setState(() {
+        _isLoading = false;
+        _successMessage = 'Colour-coding ranges saved.';
+        _errorMessage =
+            'Device sync over WiFi isn\'t implemented yet — connect via '
+            'Bluetooth to push these thresholds to the device.';
+      });
+      return;
+    }
+
     try {
       final bleOps = ref.read(bleOperationsProvider);
 
-      // 1. Write stage state
       final stageState = StageStateData(
         mode: _mode,
         species: _species,
@@ -377,27 +469,22 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       );
       await bleOps.writeStageState(stageState);
 
-      // 2. Write thresholds for all three stages
       for (var stage in [
         GrowthStage.incubation,
         GrowthStage.pinning,
-        GrowthStage.fruiting
+        GrowthStage.fruiting,
       ]) {
         final config = _stageConfigs[stage]!;
 
-        // Parse light timing
         int? lightOnMinutes;
         int? lightOffMinutes;
         final lightMode = config['lightMode'] as LightMode;
         if (lightMode == LightMode.cycle) {
           final onParts = _controllers[stage]!['lightOnTime']!.text.split(':');
-          final offParts =
-              _controllers[stage]!['lightOffTime']!.text.split(':');
+          final offParts = _controllers[stage]!['lightOffTime']!.text.split(':');
           if (onParts.length == 2 && offParts.length == 2) {
-            lightOnMinutes =
-                (int.parse(onParts[0]) * 60) + int.parse(onParts[1]);
-            lightOffMinutes =
-                (int.parse(offParts[0]) * 60) + int.parse(offParts[1]);
+            lightOnMinutes = (int.parse(onParts[0]) * 60) + int.parse(onParts[1]);
+            lightOffMinutes = (int.parse(offParts[0]) * 60) + int.parse(offParts[1]);
           }
         }
 
@@ -416,46 +503,23 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         );
 
         await bleOps.writeStageThresholds(thresholds);
-
-        developer.log(
-          '✅ Wrote thresholds for ${stage.displayName}',
-          name: 'mushpi.stage_wizard',
-        );
       }
 
-      developer.log(
-        '✅ All settings submitted successfully',
-        name: 'mushpi.stage_wizard',
-      );
-
-      // Show success message and return to first page
       setState(() {
         _hasChanges = false;
         _successMessage = 'All settings applied successfully!';
-        _currentStep = 0; // Return to page one
+        _currentStep = 0;
       });
 
-      // Clear success message after a few seconds
       Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          setState(() {
-            _successMessage = null;
-          });
-        }
+        if (mounted) setState(() => _successMessage = null);
       });
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to save settings: $e';
-      });
-      developer.log(
-        '❌ Failed to save settings: $e',
-        name: 'mushpi.stage_wizard',
-        error: e,
-      );
+      setState(() => _errorMessage = 'Failed to save settings: $e');
+      developer.log('❌ Failed to save settings: $e',
+          name: 'mushpi.stage_wizard', error: e);
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
@@ -586,19 +650,24 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
   @override
   Widget build(BuildContext context) {
     final selectedFarmId = ref.watch(selectedMonitoringFarmIdProvider);
-    final isConnected = ref.watch(bleRepositoryProvider).isConnected;
+
+    /// Whether we can push settings to the physical device right now.
+    /// BLE and WiFi/LAN are real device transports; ThingSpeak is 
+    /// read-only telemetry and can never satisfy this.
+    final canSubmitToDevice = selectedFarmId == null
+      ? false
+      : ref.watch(farmConnectionStateProvider(selectedFarmId)).maybeWhen(
+        data: (state) => state == DeviceConnectionState.connected,
+        orElse: () => false,
+      );
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Stage Configuration'),
-        // Note: No leading close button because this is a tab screen, not a pushed route.
-        // Users navigate away using the bottom navigation tabs.
-        // Showing a close button that calls Navigator.pop() would cause
-        // "popped last page off stack" error since there's no route to pop.
+        title: const Text('Configure Stages'),
       ),
       body: selectedFarmId == null
           ? _buildFarmSelector()
-          : _buildWizard(isConnected),
+          : _buildWizard(canSubmitToDevice),
     );
   }
 
@@ -1115,6 +1184,79 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
 
         const SizedBox(height: 24),
 
+        Text(
+          'Chart Colour-Coding Range',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Colours readings green (in range) or red (out of range) on the Environmental Charts screen. Not sent to the device. Temperature above is reused directly; CO2 Maximum above is reused as the ceiling.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controllers['co2ColorMin'],
+                decoration: const InputDecoration(
+                  labelText: 'CO2 Minimum for Chart (ppm)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.air),
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (_) => setState(() => _hasChanges = true),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextField(
+                controller: controllers['rhColorMax'],
+                decoration: const InputDecoration(
+                  labelText: 'Humidity Maximum for Chart (%)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.water_drop_outlined),
+                  helperText: 'Paired with Humidity Minimum above'
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() => _hasChanges = true),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16,),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controllers['lightColorMin'],
+                decoration: const InputDecoration(
+                  labelText: 'Light Minimum for Chart (lx)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() => _hasChanges = true),
+              ),
+              ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextField(
+                controller: controllers['lightColorMax'],
+                decoration: const InputDecoration(
+                  labelText: 'Light Maximum for Chart (lx)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() => _hasChanges = true),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
         // Light Mode
         Text(
           'Light Mode',
@@ -1378,7 +1520,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             Expanded(
               flex: 2,
               child: FilledButton.icon(
-                onPressed: _isLoading || !isConnected
+                onPressed: _isLoading || (_currentStep == _totalSteps - 1 &&  !isConnected)
                     ? null
                     : (_currentStep == _totalSteps - 1
                         ? _submitAllSettings

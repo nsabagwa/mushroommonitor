@@ -332,6 +332,7 @@ class FarmOperations {
     String? notes,
     Species? primarySpecies,
     String? imageUrl,
+    Map<String, dynamic>? metadata,
   }) async {
     try {
       developer.log(
@@ -346,6 +347,7 @@ class FarmOperations {
         notes: notes,
         primarySpecies: primarySpecies,
         imageUrl: imageUrl,
+        metadata: metadata,
       );
 
       _refreshFarms();

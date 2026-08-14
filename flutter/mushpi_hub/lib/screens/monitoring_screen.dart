@@ -247,7 +247,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Your MushPi is offline. Showing last known data. Real-time updates paused.',
+                                'Your MushPi is offline. Real-time updates paused unless you to the LAN or ThingSpeak.',
                                 style: TextStyle(color: Colors.orange.shade900),
                               ),
                               const SizedBox(height: 12),
@@ -1078,19 +1078,31 @@ class _ActuatorStateCard extends ConsumerWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.settings_remote),
-                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    'Actuators',
-                    style: Theme.of(context).textTheme.titleMedium,
+                  child: InkWell(
+                    onTap: () => StatefulNavigationShell.of(context).goBranch(2),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.settings_remote),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Actuator Modes', 
+                          style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Reload',
-                  onPressed: () => ref.refresh(farmControlTargetsProvider(farmId)),
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: () => StatefulNavigationShell.of(context).goBranch(2),
+                  tooltip: 'Open Control Screen',
                 ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => ref.refresh(farmControlTargetsProvider(farmId)),
+                  tooltip: 'Reload',
+                )
               ],
             ),
             const SizedBox(height: 12),
@@ -1389,17 +1401,26 @@ class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
               children: [
                 Icon(Icons.timeline, color: cs.primary),
                 const SizedBox(width: 8),
-                Text(
-                  'Stage Progress',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                Expanded(
+                  child: InkWell(
+                    onTap:() => StatefulNavigationShell.of(context).goBranch(3), // Stage tab
+                    child: Text(
+                      'Stage Progress',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ),
                 ),
-                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right, size: 20),
+                  tooltip: 'Open Stage screen',
+                  onPressed: () => StatefulNavigationShell.of(context).goBranch(3),
+                ),
                 IconButton(
                   icon: const Icon(Icons.refresh, size: 20),
+                  tooltip: 'Reload Stage data',
                   onPressed: _loadStageData,
-                  tooltip: 'Refresh',
                 ),
               ],
             ),

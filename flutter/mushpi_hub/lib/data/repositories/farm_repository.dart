@@ -1,4 +1,5 @@
 import 'dart:developer' as developer;
+import 'dart:convert';
 import 'package:drift/drift.dart';
 import '../database/app_database.dart';
 import '../models/farm.dart' as models;
@@ -670,13 +671,14 @@ class FarmRepository {
   /// Encode metadata to JSON string
   String _encodeMetadata(Map<String, dynamic> metadata) {
     // In production, use json.encode()
-    return metadata.toString();
+    return jsonEncode(metadata);
   }
 
   /// Decode metadata from JSON string
   Map<String, dynamic> _decodeMetadata(String metadata) {
     // In production, use json.decode()
-    return {};
+    try {return Map<String, dynamic>.from(jsonDecode(metadata) as Map);}
+    catch (_) {return {};}
   }
 
   /// Encode photo URLs to JSON array string

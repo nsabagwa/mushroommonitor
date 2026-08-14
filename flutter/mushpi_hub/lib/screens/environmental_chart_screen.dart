@@ -9,6 +9,8 @@ import '../providers/readings_provider.dart';
 import '../providers/current_farm_provider.dart';
 import '../providers/farms_provider.dart';
 
+import '../core/constants/ble_constants.dart';
+
 /// Environmental Chart Screen displaying trend data with customizable time range.
 ///
 /// Shows line charts for:
@@ -153,6 +155,7 @@ class _EnvironmentalChartScreenState
                         minValue: 0.0,
                         maxValue: 50.0,
                         getValue: (r) => r.temperatureC,
+                        colorRange: _colorRangeFor(selectedFarm.metadata, 'temp'),
                       ),
                       const SizedBox(height: 24),
                       _EnvironmentalChart(
@@ -164,6 +167,7 @@ class _EnvironmentalChartScreenState
                         minValue: 0.0,
                         maxValue: 100.0,
                         getValue: (r) => r.relativeHumidity,
+                        colorRange: _colorRangeFor(selectedFarm.metadata, 'humidity'),
                       ),
                       const SizedBox(height: 24),
                       _EnvironmentalChart(
@@ -175,6 +179,7 @@ class _EnvironmentalChartScreenState
                         minValue: 0.0,
                         maxValue: 5000.0,
                         getValue: (r) => r.co2Ppm.toDouble(),
+                        colorRange: _colorRangeFor(selectedFarm.metadata, 'co2'),
                       ),
                       const SizedBox(height: 24),
                       _EnvironmentalChart(
@@ -186,6 +191,7 @@ class _EnvironmentalChartScreenState
                         minValue: 0.0,
                         maxValue: 200.0,
                         getValue: (r) => r.lightRaw.toDouble(),
+                        colorRange: _colorRangeFor(selectedFarm.metadata, 'light'),
                       ),
                       const SizedBox(height: 80), // Bottom padding
                     ],
@@ -394,6 +400,7 @@ class _EnvironmentalChart extends StatelessWidget {
   final double minValue;
   final double maxValue;
   final double Function(Reading) getValue;
+  final ({double min, double max})? colorRange;
 
   const _EnvironmentalChart({
     required this.readings,
@@ -404,6 +411,7 @@ class _EnvironmentalChart extends StatelessWidget {
     required this.minValue,
     required this.maxValue,
     required this.getValue,
+    this.colorRange,
   });
 
   @override
@@ -419,6 +427,7 @@ class _EnvironmentalChart extends StatelessWidget {
       maxValue: maxValue,
       spots: spots,
       readings: readings,
+      colorRange: colorRange,
     );
   }
 }
@@ -433,6 +442,7 @@ class _ChartCard extends StatefulWidget {
   final double maxValue;
   final List<FlSpot> spots;
   final List<Reading> readings;
+  final ({double min, double max})? colorRange;
 
   const _ChartCard({
     required this.title,
@@ -443,6 +453,7 @@ class _ChartCard extends StatefulWidget {
     required this.maxValue,
     required this.spots,
     required this.readings,
+    required this.colorRange,
   });
 
   @override
@@ -729,22 +740,45 @@ class _ChartCardState extends State<_ChartCard> {
       // Use fixed Y-axis range without padding
       minY: widget.minValue,
       maxY: widget.maxValue,
-      lineBarsData: [
-        LineChartBarData(
-          spots: widget.spots,
-          isCurved: true,
-          color: widget.color,
-          barWidth: 3,
-          dotData: FlDotData(
-            show: _visibleWindowMs <
-                3 * 60 * 60 * 1000, // Show dots if zoomed in (< 3 hours)
-          ),
-          belowBarData: BarAreaData(
-            show: true,
-            color: widget.color.withValues(alpha: 0.1),
-          ),
-        ),
-      ],
+      lineBarsData: widget.colorRange != null
+          ? _buildColoredLineSegments(
+              widget.spots,
+              widget.colorRange!.min,
+              widget.colorRange!.max,
+            )
+          : [
+              LineChartBarData(
+                spots: widget.spots,
+                isCurved: true,
+                color: widget.color,
+                barWidth: 3,
+                dotData: FlDotData(
+                  show: _visibleWindowMs < 3 * 60 * 60 * 1000,
+                ),
+                belowBarData: BarAreaData(
+                  show: true,
+                  color: widget.color.withValues(alpha: 0.1),
+                ),
+              ),
+            ],
+      extraLinesData: widget.colorRange != null
+          ? ExtraLinesData(
+              horizontalLines: [
+                HorizontalLine(
+                  y: widget.colorRange!.min,
+                  color: Colors.green.withValues(alpha: 0.4),
+                  strokeWidth: 1,
+                  dashArray: const [4, 4],
+                ),
+                HorizontalLine(
+                  y: widget.colorRange!.max,
+                  color: Colors.green.withValues(alpha: 0.4),
+                  strokeWidth: 1,
+                  dashArray: const [4, 4],
+                ),
+              ],
+            )
+          : const ExtraLinesData(),
       lineTouchData: LineTouchData(
         enabled: true,
         touchTooltipData: LineTouchTooltipData(
@@ -786,6 +820,68 @@ class _ChartCardState extends State<_ChartCard> {
         DateTime.fromMillisecondsSinceEpoch((_scrollOffset + minTime).toInt());
     return DateFormat('MMM dd, HH:mm').format(currentTime);
   }
+}
+
+({double min, double max})? _colorRangeFor(
+  Map<String, dynamic>? metadata,
+  String sensorKey,
+) {
+  final currentStageId = metadata?['currentGrowthStage'] as int?;
+  if (currentStageId == null) return null;
+  final stage = GrowthStage.fromId(currentStageId);
+  final colorRanges = metadata?['colorRanges'] as Map<String, dynamic>?;
+  final stageRanges = colorRanges?[stage.name] as Map<String, dynamic>?;
+  final sensorRange = stageRanges?[sensorKey] as Map<String, dynamic>?;
+  final min = (sensorRange?['min'] as num?)?.toDouble();
+  final max = (sensorRange?['max'] as num?)?.toDouble();
+  if (min == null || max == null) return null;
+  return (min: min, max: max);
+}
+
+/// Splits [spots] into per-run segments so the line (and its dots) render
+/// green while in range and red while out of range. Segments share their
+/// boundary point so the line stays visually continuous across a crossing.
+List<LineChartBarData> _buildColoredLineSegments(
+  List<FlSpot> spots,
+  double rangeMin,
+  double rangeMax,
+) {
+  if (spots.isEmpty) return [];
+
+  bool inRange(FlSpot s) => s.y >= rangeMin && s.y <= rangeMax;
+
+  LineChartBarData barFor(List<FlSpot> segment, bool ok) {
+    final color = ok ? Colors.green : Colors.red;
+    return LineChartBarData(
+      spots: segment,
+      isCurved: false,
+      color: color,
+      barWidth: 3,
+      dotData: FlDotData(
+        show: true,
+        getDotPainter: (spot, percent, bar, index) =>
+            FlDotCirclePainter(radius: 2.5, color: color, strokeWidth: 0),
+      ),
+      belowBarData: BarAreaData(show: false),
+    );
+  }
+
+  final segments = <LineChartBarData>[];
+  var current = <FlSpot>[spots.first];
+  var currentOk = inRange(spots.first);
+
+  for (var i = 1; i < spots.length; i++) {
+    final spot = spots[i];
+    final ok = inRange(spot);
+    current.add(spot);
+    if (ok != currentOk) {
+      segments.add(barFor(current, currentOk));
+      current = [spot];
+      currentOk = ok;
+    }
+  }
+  segments.add(barFor(current, currentOk));
+  return segments;
 }
 
 /// Helper function to create FlSpot list from readings with timestamp-based x-axis
