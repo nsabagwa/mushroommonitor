@@ -351,6 +351,10 @@ class FarmOperations {
       );
 
       _refreshFarms();
+      /// Also invalidate the specific farm so anything keyed off
+      /// farmByIdProvider (e.g. the State wizard) sees the new metadata
+      /// immediately, same as updateFarmDevice() already does.
+      ref.invalidate(farmByIdProvider(id));
 
       developer.log(
         'Successfully updated farm: $id',

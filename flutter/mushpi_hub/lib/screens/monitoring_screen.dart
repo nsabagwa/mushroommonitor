@@ -577,8 +577,8 @@ class _FarmInfoCard extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: onViewDetails,
-                icon: const Icon(Icons.visibility),
-                label: const Text('View Full Details'),
+                icon: const Icon(Icons.settings),
+                label: const Text('Farm Connection Settings'),
               ),
             ),
           ],
@@ -1226,7 +1226,7 @@ class _ActuatorUnavailable extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Actuator modes unavailable. Connect to the device and tap reload.',
+              'Tap the arrow to see Actuator Status',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
@@ -1239,62 +1239,17 @@ class _ActuatorUnavailable extends StatelessWidget {
 }
 
 /// Stage Progress card (unchanged)
-class _StageProgressCard extends ConsumerStatefulWidget {
+/// Stage Progress card — reflects the device's live stage state.
+/// Rebuilds automatically whenever [stageStateProvider] is invalidated,
+/// e.g. right after the Stage wizard successfully pushes new settings
+/// to the device (see stage_wizard_screen.dart's _submitAllSettings()).
+class _StageProgressCard extends ConsumerWidget {
   const _StageProgressCard();
 
   @override
-  ConsumerState<_StageProgressCard> createState() => _StageProgressCardState();
-}
-
-class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
-  StageStateData? _stageData;
-  bool _isLoading = false;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStageData();
-  }
-
-  Future<void> _loadStageData() async {
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final bleOps = ref.read(bleOperationsProvider);
-      final data = await bleOps.readStageState();
-
-      if (!mounted) return;
-
-      if (data != null) {
-        developer.log(
-          '🎯 MONITORING DISPLAY: Received mode=${data.mode.name} (id=${data.mode.id}, displayName="${data.mode.displayName}")',
-          name: 'MonitoringScreen._StageProgressCard',
-        );
-      }
-
-      setState(() {
-        _stageData = data;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _errorMessage = 'Failed to load stage data';
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final stageStateAsync = ref.watch(stageStateProvider);
 
     return Card(
       elevation: 2,
@@ -1309,7 +1264,7 @@ class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: InkWell(
-                    onTap:() => StatefulNavigationShell.of(context).goBranch(3), // Stage tab
+                    onTap: () => StatefulNavigationShell.of(context).goBranch(3),
                     child: Text(
                       'Stage Progress',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -1326,30 +1281,31 @@ class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
                 IconButton(
                   icon: const Icon(Icons.refresh, size: 20),
                   tooltip: 'Reload Stage data',
-                  onPressed: _loadStageData,
+                  onPressed: () => ref.invalidate(stageStateProvider),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            _buildContent(cs),
+            _buildContent(context, cs, stageStateAsync),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContent(ColorScheme cs) {
-    if (_isLoading) {
-      return const Center(
+  Widget _buildContent(
+    BuildContext context,
+    ColorScheme cs,
+    AsyncValue<StageStateData?> stageStateAsync,
+  ) {
+    return stageStateAsync.when(
+      loading: () => const Center(
         child: Padding(
           padding: EdgeInsets.all(16.0),
           child: CircularProgressIndicator(),
         ),
-      );
-    }
-
-    if (_errorMessage != null) {
-      return Container(
+      ),
+      error: (error, stack) => Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: cs.errorContainer,
@@ -1361,187 +1317,189 @@ class _StageProgressCardState extends ConsumerState<_StageProgressCard> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                _errorMessage!,
+                'Failed to load stage data',
                 style: TextStyle(color: cs.onErrorContainer),
               ),
             ),
           ],
         ),
-      );
-    }
-
-    if (_stageData == null) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, color: cs.onSurfaceVariant),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'No stage data available. Configure stages to begin.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-              ),
+      ),
+      data: (stageData) {
+        if (stageData == null) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: cs.outlineVariant),
             ),
-          ],
-        ),
-      );
-    }
-
-    final daysElapsed = _stageData!.daysInStage;
-    final expectedDays = _stageData!.expectedDays;
-    final progressPercent = expectedDays > 0
-        ? (daysElapsed / expectedDays * 100).clamp(0, 100)
-        : 0.0;
-    final daysRemaining = (expectedDays - daysElapsed).clamp(0, expectedDays);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${_stageData!.species.displayName} - ${_stageData!.stage.displayName}',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: cs.primary,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _stageData!.mode.displayName,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: cs.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'No stage data available. Configure stages to begin.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
                   ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: progressPercent >= 100
-                    ? cs.tertiaryContainer
-                    : cs.primaryContainer,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                progressPercent >= 100 ? 'COMPLETE' : 'IN PROGRESS',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: progressPercent >= 100
-                          ? cs.onTertiaryContainer
-                          : cs.onPrimaryContainer,
-                    ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Day $daysElapsed of $expectedDays',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-                Text(
-                  '${progressPercent.toStringAsFixed(0)}%',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: cs.primary,
-                      ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: progressPercent / 100,
-                minHeight: 12,
-                backgroundColor: cs.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  progressPercent >= 100 ? cs.tertiary : cs.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
+          );
+        }
+
+        final daysElapsed = stageData.daysInStage;
+        final expectedDays = stageData.expectedDays;
+        final progressPercent = expectedDays > 0
+            ? (daysElapsed / expectedDays * 100).clamp(0, 100)
+            : 0.0;
+        final daysRemaining =
+            (expectedDays - daysElapsed).clamp(0, expectedDays);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: _StageMetric(
-                icon: Icons.calendar_today,
-                label: 'Started',
-                value: _formatDate(_stageData!.stageStartTime),
-                color: cs.primary,
-              ),
-            ),
-            Expanded(
-              child: _StageMetric(
-                icon: progressPercent >= 100
-                    ? Icons.check_circle
-                    : Icons.access_time,
-                label: progressPercent >= 100 ? 'Complete' : 'Days Remaining',
-                value: progressPercent >= 100
-                    ? 'Ready to advance'
-                    : '$daysRemaining days',
-                color: progressPercent >= 100 ? cs.tertiary : cs.secondary,
-              ),
-            ),
-          ],
-        ),
-        if (progressPercent < 100 && _stageData!.mode != ControlMode.manual)
-          Padding(
-            padding: const EdgeInsets.only(top: 16.0),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: cs.secondaryContainer.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: cs.outline.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: cs.onSecondaryContainer,
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${stageData.species.displayName} - ${stageData.stage.displayName}',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: cs.primary,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        stageData.mode.displayName,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _stageData!.mode == ControlMode.full
-                          ? 'Will auto-advance to next stage when complete'
-                          : 'Manual advancement required when complete',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cs.onSecondaryContainer,
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: progressPercent >= 100
+                        ? cs.tertiaryContainer
+                        : cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    progressPercent >= 100 ? 'COMPLETE' : 'IN PROGRESS',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: progressPercent >= 100
+                              ? cs.onTertiaryContainer
+                              : cs.onPrimaryContainer,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Day $daysElapsed of $expectedDays',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
                           ),
                     ),
+                    Text(
+                      '${progressPercent.toStringAsFixed(0)}%',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: cs.primary,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: progressPercent / 100,
+                    minHeight: 12,
+                    backgroundColor: cs.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      progressPercent >= 100 ? cs.tertiary : cs.primary,
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-      ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _StageMetric(
+                    icon: Icons.calendar_today,
+                    label: 'Started',
+                    value: _formatDate(stageData.stageStartTime),
+                    color: cs.primary,
+                  ),
+                ),
+                Expanded(
+                  child: _StageMetric(
+                    icon: progressPercent >= 100
+                        ? Icons.check_circle
+                        : Icons.access_time,
+                    label: progressPercent >= 100 ? 'Complete' : 'Days Remaining',
+                    value: progressPercent >= 100
+                        ? 'Ready to advance'
+                        : '$daysRemaining days',
+                    color: progressPercent >= 100 ? cs.tertiary : cs.secondary,
+                  ),
+                ),
+              ],
+            ),
+            if (progressPercent < 100 && stageData.mode != ControlMode.manual)
+              Padding(
+                padding: const EdgeInsets.only(top: 16.0),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cs.secondaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: cs.outline.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: cs.onSecondaryContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          stageData.mode == ControlMode.full
+                              ? 'Will auto-advance to next stage when complete'
+                              : 'Manual advancement required when complete',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: cs.onSecondaryContainer,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 

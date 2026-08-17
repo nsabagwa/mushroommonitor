@@ -281,6 +281,17 @@ final bleOperationsProvider = Provider<BLEOperations>((ref) {
   );
 });
 
+/// Cached read of the device's stage/progress state, used by the Monitoring
+/// screen's Stage Progress card. Invalidated by the Stage wizard right after
+/// it successfully pushes new stage state to the device, so the card
+/// reflects a save without leaving the Monitoring tab.
+final stageStateProvider = FutureProvider.autoDispose<StageStateData?>((ref) async {
+  final bleOps = ref.watch(bleOperationsProvider);
+  final data = await bleOps.readStageState();
+  print('🎯 stageStateProvider: loaded mode=${data?.mode.name}, stage=${data?.stage.name}');
+  return data;
+});
+
 /// BLE Operations wrapper class
 ///
 /// Provides high-level BLE operations with database integration.

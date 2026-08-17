@@ -88,7 +88,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         // Chart colour-coding only - never sent to the device
         'co2ColorMin': TextEditingController(text: '0'),
         'rhColorMax': TextEditingController(text: '100'),
-        'lightColorMax': TextEditingController(text: '100'),
+        'lightColorMax': TextEditingController(text: '200'),
         'lightColorMin': TextEditingController(text: '0'),
       };
     }
@@ -214,7 +214,7 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         _controllers[stage]!['co2ColorMin']!.text = ((saved?['co2'] as Map?)?['min'] as num ?)?.toString() ?? '0';
         _controllers[stage]!['rhColorMax']!.text = ((saved?['humidity'] as Map?)?['max'] as num ?)?.toString() ?? '100';
         _controllers[stage]!['lightColorMin']!.text = ((saved?['light'] as Map?)?['min'] as num ?)?.toString() ?? '0';
-        _controllers[stage]!['lightColorMax']!.text = ((saved?['light'] as Map?)?['max'] as num ?)?.toString() ?? '100';
+        _controllers[stage]!['lightColorMax']!.text = ((saved?['light'] as Map?)?['max'] as num ?)?.toString() ?? '200';
       }
     }
 
@@ -457,6 +457,16 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
       return;
     }
 
+    final bleConnected = ref.read(bleRepositoryProvider).isConnected;
+    if (!bleConnected) {
+      setState(() {
+        _isLoading = false;
+        _hasChanges = false;
+        _successMessage = 'Colour-coding ranges saved. Connect to BLE to push thresholds to the device';
+      });
+      return;
+    }
+
     try {
       final bleOps = ref.read(bleOperationsProvider);
 
@@ -505,10 +515,12 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
         await bleOps.writeStageThresholds(thresholds);
       }
 
+      ref.invalidate(stageStateProvider);
+      
       setState(() {
         _hasChanges = false;
-        _successMessage = 'All settings applied successfully!';
         _currentStep = 0;
+        _successMessage = 'All Settings saved.';
       });
 
       Future.delayed(const Duration(seconds: 3), () {
@@ -1520,11 +1532,11 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
             Expanded(
               flex: 2,
               child: FilledButton.icon(
-                onPressed: _isLoading || (_currentStep == _totalSteps - 1 &&  !isConnected)
-                    ? null
-                    : (_currentStep == _totalSteps - 1
-                        ? _submitAllSettings
-                        : _nextStep),
+                onPressed: _isLoading
+                  ? null
+                  : (_currentStep == _totalSteps - 1
+                      ? _submitAllSettings
+                      : _nextStep),
                 icon: _isLoading
                     ? const SizedBox(
                         width: 20,

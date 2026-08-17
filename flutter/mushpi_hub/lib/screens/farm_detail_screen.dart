@@ -177,16 +177,6 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
                 // TODO: Add charts
                 // TODO: Add harvest list
 
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: Text(
-                      'Farm monitoring interface coming soon...',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ),
               ],
             ),
           );
