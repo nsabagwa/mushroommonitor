@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../data/models/farm.dart';
 import '../core/theme/app_theme.dart';
 
+import '../providers/thingspeak_provider.dart';
+
 /// Card widget displaying farm summary information.
 ///
 /// Shows:
@@ -31,9 +33,19 @@ class FarmCard extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final customColors = Theme.of(context).extension<AppCustomColors>()!;
     
-    // Single source of truth: farm is online if lastActive < 1 minute
-    final isOnline = farm.lastActive != null && 
-                     DateTime.now().difference(farm.lastActive!).inMinutes < 1;
+    // Watch the Monitoring tab: a farm is online if the LAN
+    // device is live OR ThingSpeak is returning data
+    final lanOnline = farm.lastActive != null &&
+        DateTime.now().difference(farm.lastActive!).inMinutes < 1;
+    final hasThingSpeak = farm.thingSpeakChannelId != null &&
+       farm.thingSpeakReadApiKey != null;
+    final tsAsync = hasThingSpeak
+        ? ref.watch(thingSpeakProvider((
+          channelId: farm.thingSpeakChannelId!, 
+          readApiKey: farm.thingSpeakReadApiKey!))) 
+          : null;
+    final tsOnline = tsAsync?.hasValue ?? false;
+    final isOnline = lanOnline || tsOnline;
 
     return Card(
       clipBehavior: Clip.antiAlias,
