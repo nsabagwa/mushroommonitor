@@ -9,7 +9,7 @@ import '../providers/readings_provider.dart';
 import '../providers/current_farm_provider.dart';
 import '../providers/farms_provider.dart';
 
-import '../core/constants/ble_constants.dart';
+import '../core/utils/color_range_utils.dart';
 
 /// Environmental Chart Screen displaying trend data with customizable time range.
 ///
@@ -155,7 +155,7 @@ class _EnvironmentalChartScreenState
                         minValue: 0.0,
                         maxValue: 50.0,
                         getValue: (r) => r.temperatureC,
-                        colorRange: _colorRangeFor(selectedFarm.metadata, 'temp'),
+                        colorRange: colorRangeFor(selectedFarm.metadata, 'temp'),
                       ),
                       const SizedBox(height: 24),
                       _EnvironmentalChart(
@@ -167,7 +167,7 @@ class _EnvironmentalChartScreenState
                         minValue: 0.0,
                         maxValue: 100.0,
                         getValue: (r) => r.relativeHumidity,
-                        colorRange: _colorRangeFor(selectedFarm.metadata, 'humidity'),
+                        colorRange: colorRangeFor(selectedFarm.metadata, 'humidity'),
                       ),
                       const SizedBox(height: 24),
                       _EnvironmentalChart(
@@ -179,7 +179,7 @@ class _EnvironmentalChartScreenState
                         minValue: 0.0,
                         maxValue: 5000.0,
                         getValue: (r) => r.co2Ppm.toDouble(),
-                        colorRange: _colorRangeFor(selectedFarm.metadata, 'co2'),
+                        colorRange: colorRangeFor(selectedFarm.metadata, 'co2'),
                       ),
                       const SizedBox(height: 24),
                       _EnvironmentalChart(
@@ -191,7 +191,7 @@ class _EnvironmentalChartScreenState
                         minValue: 0.0,
                         maxValue: 200.0,
                         getValue: (r) => r.lightRaw.toDouble(),
-                        colorRange: _colorRangeFor(selectedFarm.metadata, 'light'),
+                        colorRange: colorRangeFor(selectedFarm.metadata, 'light'),
                       ),
                       const SizedBox(height: 80), // Bottom padding
                     ],
@@ -820,22 +820,6 @@ class _ChartCardState extends State<_ChartCard> {
         DateTime.fromMillisecondsSinceEpoch((_scrollOffset + minTime).toInt());
     return DateFormat('MMM dd, HH:mm').format(currentTime);
   }
-}
-
-({double min, double max})? _colorRangeFor(
-  Map<String, dynamic>? metadata,
-  String sensorKey,
-) {
-  final currentStageId = metadata?['currentGrowthStage'] as int?;
-  if (currentStageId == null) return null;
-  final stage = GrowthStage.fromId(currentStageId);
-  final colorRanges = metadata?['colorRanges'] as Map<String, dynamic>?;
-  final stageRanges = colorRanges?[stage.name] as Map<String, dynamic>?;
-  final sensorRange = stageRanges?[sensorKey] as Map<String, dynamic>?;
-  final min = (sensorRange?['min'] as num?)?.toDouble();
-  final max = (sensorRange?['max'] as num?)?.toDouble();
-  if (min == null || max == null) return null;
-  return (min: min, max: max);
 }
 
 /// Splits [spots] into per-run segments so the line (and its dots) render

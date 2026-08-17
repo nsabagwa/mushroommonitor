@@ -14,6 +14,8 @@ import '../core/constants/ble_constants.dart';
 import '../core/utils/ble_serializer.dart';
 import '../data/models/farm.dart';
 
+import '../core/utils/color_range_utils.dart';
+
 /// Monitoring screen showing real‑time environmental data and system status.
 ///
 /// Displays:
@@ -747,6 +749,8 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
         final humidity = reading is ThingSpeakReading ? reading.humidity : reading.relativeHumidity;
         final co2 = reading is ThingSpeakReading ? reading.co2 : reading.co2Ppm;
         final light = reading is ThingSpeakReading ? reading.light : reading.lightRaw;
+
+        final metadata = farm.metadata;
       
       return Column(
         children: [
@@ -757,7 +761,7 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
                   icon: Icons.thermostat,
                   label: 'Temperature',
                   value: '${temp?.toStringAsFixed(1) ?? "--"}°C',
-                  color: _getTemperatureColor(temp ?? 20),
+                  color: _getTemperatureColor(temp ?? 20, metadata),
                 ),
               ),
               Expanded(
@@ -765,7 +769,7 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
                   icon: Icons.water_drop,
                   label: 'Humidity',
                   value: '${humidity?.toStringAsFixed(0) ?? "--"}%',
-                  color: _getHumidityColor(humidity ?? 70),
+                  color: _getHumidityColor(humidity ?? 70, metadata),
                 ),
               ),
             ],
@@ -778,7 +782,7 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
                   icon: Icons.air,
                   label: 'CO₂',
                   value: '${co2 ?? "--"} ppm',
-                  color: _getCO2Color(co2?.toInt() ?? 0),
+                  color: _getCO2Color(co2?.toInt() ?? 0, metadata),
                 ),
               ),
               Expanded(
@@ -814,19 +818,25 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
     );
   }
 
-  Color _getTemperatureColor(double temp) {
+  Color _getTemperatureColor(double temp, Map<String, dynamic>? metadata) {
+    final inRange = isValueInRange(metadata, 'temp', temp);
+    if (inRange != null) return inRange ? Colors.green : Colors.red;
     if (temp < 15) return Colors.blue;
     if (temp > 28) return Colors.red;
     return Colors.orange;
   }
 
-  Color _getHumidityColor(double rh) {
+  Color _getHumidityColor(double rh, Map<String, dynamic>? metadata) {
+    final inRange = isValueInRange(metadata, 'humidity', rh);
+    if (inRange != null) return inRange ? Colors.green : Colors.red;
     if (rh < 60) return Colors.orange;
     if (rh > 95) return Colors.red;
     return Colors.blue;
   }
 
-  Color _getCO2Color(int co2) {
+  Color _getCO2Color(int co2, Map<String, dynamic>? metadata) {
+    final inRange = isValueInRange(metadata, 'co2', co2.toDouble());
+    if (inRange != null) return inRange ? Colors.green : Colors.red;
     if (co2 > 2000) return Colors.red;
     if (co2 > 1000) return Colors.orange;
     return Colors.green;
