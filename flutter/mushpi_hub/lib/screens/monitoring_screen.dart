@@ -41,103 +41,6 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
       appBar: AppBar(
         title: const Text('Monitoring'),
         actions: [
-          // Connection status indicator - shows selected farm's status
-          farmsAsync.when(
-            data: (farms) {
-              if (selectedFarmId == null || farms.isEmpty) {
-                return const SizedBox.shrink();
-              }
-
-              final selectedFarm =
-                  farms.where((f) => f.id == selectedFarmId).firstOrNull;
-              if (selectedFarm == null) {
-                return const SizedBox.shrink();
-              }
-
-              // Single source of truth: farm is online if lastActive < 1 minute
-              final isOnline = selectedFarm.lastActive != null &&
-                  DateTime.now()
-                          .difference(selectedFarm.lastActive!)
-                          .inMinutes <
-                      1;
-
-              return Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Center(
-                  child: InkWell(
-                    onTap: () {
-                      // Show connection help dialog
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Row(
-                            children: [
-                              Icon(
-                                isOnline ? Icons.check_circle : Icons.cancel,
-                                color: isOnline ? Colors.green : Colors.grey,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(isOnline ? 'Farm Online' : 'Farm Offline'),
-                            ],
-                          ),
-                          content: Text(
-                            isOnline
-                                ? '${selectedFarm.name} is online and actively reporting data.'
-                                : '${selectedFarm.name} is offline.\n\nTo reconnect:\n1. Go to Farms tab\n2. Tap the farm card\n3. Tap "Connect" button\n\nNote: Farm shows "Online" if it was active within the last 1 minute.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('OK'),
-                            ),
-                            if (!isOnline)
-                              ElevatedButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                  if (context.mounted) {
-                                    context.go('/farms');
-                                  }
-                                },
-                                child: const Text('Go to Farms'),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isOnline ? Colors.green : Colors.grey,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isOnline ? Icons.check_circle : Icons.cancel,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isOnline ? 'Online' : 'Offline',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
-          ),
           // Refresh button
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -181,6 +84,22 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                 )
               : farms.first;
 
+          // Live connectivity, computed once and sharedby the state
+          // card and the reconnect banner below
+          final lanOnline = selectedFarm.lastActive != null &&
+              DateTime.now()
+                      .difference(selectedFarm.lastActive!)
+                      .inMinutes <
+                  1;
+          final hasThingSpeak = selectedFarm.thingSpeakChannelId != null &&
+              selectedFarm.thingSpeakReadApiKey != null;
+          final tsAsync = hasThingSpeak ? ref.watch(thingSpeakProvider((
+            channelId: selectedFarm.thingSpeakChannelId!,
+            readApiKey: selectedFarm.thingSpeakReadApiKey!,
+          ))): null;
+          final tsOnline = tsAsync?.hasValue ?? false;
+          final anyOnline = lanOnline || tsOnline;
+
           return RefreshIndicator(
             onRefresh: () => ref.refresh(activeFarmsProvider.future),
             child: CustomScrollView(
@@ -206,16 +125,15 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: _FarmStatusCard(farm: selectedFarm),
+                    child: _FarmStatusCard(
+                      farm: selectedFarm,
+                      lanOnline: lanOnline,
+                      tsOnline: tsOnline,),
                   ),
                 ),
 
                 // Reconnect banner if farm is offline
-                if (selectedFarm.lastActive == null ||
-                    DateTime.now()
-                            .difference(selectedFarm.lastActive!)
-                            .inMinutes >=
-                        30)
+                if (!anyOnline)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -247,7 +165,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Your MushPi is offline. Real-time updates paused unless you to the LAN or ThingSpeak.',
+                                'Your MushPi is offline. Real-time updates paused unless you connect to the LAN or ThingSpeak.',
                                 style: TextStyle(color: Colors.orange.shade900),
                               ),
                               const SizedBox(height: 12),
@@ -502,18 +420,27 @@ class _FarmDropdownSelector extends StatelessWidget {
 
 /// Farm status card for single farm
 class _FarmStatusCard extends StatelessWidget {
-  const _FarmStatusCard({required this.farm});
+  const _FarmStatusCard({
+    required this.farm,
+    required this.lanOnline,
+    required this.tsOnline,
+    });
 
   final Farm farm;
-
-  bool get isOnline {
-    if (farm.lastActive == null) return false;
-    return DateTime.now().difference(farm.lastActive!).inMinutes < 1;
-  }
+  final bool lanOnline;
+  final bool tsOnline;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isOnline = lanOnline || tsOnline;
+    final String statusLabel = lanOnline && tsOnline
+       ? 'Online (LAN + ThingSpeak)' 
+       : lanOnline 
+       ? 'Online (LAN)'
+       : tsOnline
+       ? 'Online (ThingSpeak)'
+       : 'Offline';
 
     return Card(
       child: Padding(
@@ -551,7 +478,7 @@ class _FarmStatusCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        isOnline ? 'Online' : 'Offline',
+                        statusLabel,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: isOnline ? Colors.green : Colors.grey,
                               fontWeight: FontWeight.bold,
@@ -731,9 +658,16 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
           )))
         : const AsyncValue<ThingSpeakReading>.loading();
     
-    // Use Wifi data if available, fall back to ThingSpeak
-    final bool isLocal = farm.wifiHost != null;
-    final AsyncValue<dynamic> effectiveAsync = isLocal ? wifiDataAsync : thingSpeakAsync;
+    // Prefer whichever transport actually has live data right now, 
+    // instead of locking to Wifi just because wifiHost happens to be configured
+    final AsyncValue<dynamic> effectiveAsync;
+    if (wifiDataAsync.hasValue) {
+      effectiveAsync = wifiDataAsync;
+    } else if (hasThingSpeak && thingSpeakAsync.hasValue) {
+      effectiveAsync = thingSpeakAsync;
+    } else {
+      effectiveAsync = wifiDataAsync;
+    }
 
     return Card(
       elevation: 2,
@@ -778,9 +712,6 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
 
   Widget _buildHeader(BuildContext context, AsyncValue<dynamic> effectiveAsync) {
 
-    final isLocal = farm.wifiHost != null;
-    final isRemote = farm.thingSpeakChannelId != null && farm.thingSpeakReadApiKey != null;
-
     return Row(
       children: [
         Expanded(
@@ -792,31 +723,6 @@ class _EnvironmentalOverviewCard extends ConsumerWidget {
           ),
         ),
       
-
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: isLocal ? Colors.green.withValues(alpha: 0.15) : isRemote ? Colors.blue.withValues(alpha: 0.15) : Colors.grey,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isLocal ? Colors.green : Colors.blue, width: 1.5),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isLocal? Icons.lan : Icons.cloud, size: 16, color: isLocal ? Colors.green : Colors.blue),
-              const SizedBox(width: 6),
-              Text(
-                isLocal ? 'Local' : 'Remote',
-                style: TextStyle(
-                  color: isLocal ? Colors.green : isRemote ? Colors.blue : Colors.grey,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ),
         const SizedBox(width: 8),
         // Timestamp
         effectiveAsync.when(
