@@ -37,7 +37,9 @@ class FarmsDao extends DatabaseAccessor<AppDatabase> with _$FarmsDaoMixin {
 
   /// Update farm
   Future<bool> updateFarm(FarmsCompanion farm) {
-    return update(farms).replace(farm);
+    return (update(farms)..where((f) => f.id.equals(farm.id.value)))
+      .write(farm)
+      .then((rows) => rows > 0);
   }
 
   /// Update farm's last active timestamp

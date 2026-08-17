@@ -435,14 +435,12 @@ class _StageWizardScreenState extends ConsumerState<StageWizardScreen>
           'currentGrowthStage': _currentStage.id,
         },
       );
-    } catch (e) {
-      developer.log(
-        '❌ Failed to save colour-coding ranges: $e',
-        name: 'mushpi.stage_wizard',
-        error: e,
-      );
-      // Non-fatal — fall through and still try the device push.
-    }
+      print('Color ranges being saved: $colorRanges');
+      print('✅ updateFarm COMPLETED for farm $selectedFarmId'); 
+    } catch (e, st) {
+  print('❌❌❌ updateFarm THREW: $e');
+  print('stack: $st');
+}
 
     // 2. Push to the physical device, if the transport supports it.
     final farm = await ref.read(farmByIdProvider(selectedFarmId).future);

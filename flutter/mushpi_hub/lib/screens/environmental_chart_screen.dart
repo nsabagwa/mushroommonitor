@@ -108,6 +108,8 @@ class _EnvironmentalChartScreenState
             (f) => f.id == selectedFarmId,
             orElse: () => farms.first,
           );
+          final tempRange = colorRangeFor(selectedFarm.metadata, 'temp');
+          print('🎨 CHART BUILD: temp range = $tempRange, metadata currentGrowthStage = ${selectedFarm.metadata?['currentGrowthStage']}');
 
           return readingsAsync.when(
             data: (readings) {
